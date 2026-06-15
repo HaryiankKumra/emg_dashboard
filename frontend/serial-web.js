@@ -145,10 +145,11 @@ const SerialWeb = {
 
           try {
             const packet = JSON.parse(line);
+            const rxPerf = performance.now();
             this.stats.rx_packets++;
             if (window.EmgEngine) {
               EmgEngine.setStats(this.stats);
-              EmgEngine.onPacket(packet);
+              EmgEngine.onPacket(packet, rxPerf);
             }
           } catch {
             this.stats.rx_errors++;

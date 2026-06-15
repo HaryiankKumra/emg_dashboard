@@ -238,11 +238,46 @@ class ChannelData {
 
 // ── Recorder helpers ───────────────────────────────────────────────────────────
 
-/** ESP32 master JSON sends t0 in milliseconds (see hardware.tex). */
+/** ESP32 master JSON: t0 is slave millis() at first sample of batch (NOT wall clock). */
+function packetT0Ms(packet) {
+  if (packet.t0_ms != null) return parseInt(packet.t0_ms, 10);
+  return parseInt(packet.t0 ?? 0, 10);
+}
+
 function packetT0Us(packet) {
   if (packet.t0_us != null) return parseInt(packet.t0_us, 10);
-  if (packet.t0_ms != null) return parseInt(packet.t0_ms, 10) * 1000;
-  return parseInt(packet.t0 ?? 0, 10) * 1000;
+  return packetT0Ms(packet) * 1000;
+}
+
+function getSystemTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return 'UTC';
+  }
+}
+
+function wallMsToIso(wallMs) {
+  return new Date(wallMs).toISOString();
+}
+
+/** Local wall-clock string in system timezone (e.g. Asia/Kolkata on Indian PC). */
+function wallMsToLocal(wallMs, timeZone) {
+  const d = new Date(wallMs);
+  const tz = timeZone || getSystemTimezone();
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+  const get = (t) => parts.find(p => p.type === t)?.value ?? '00';
+  const ms = String(d.getMilliseconds()).padStart(3, '0');
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}.${ms}`;
 }
 
 function estimateMedianDtUs(chSamples, active) {
@@ -307,6 +342,9 @@ class Recorder {
     this._exercise = 'squat';
     this._trial_no = 1;
     this._session_timestamp = '';
+    this._timezone = getSystemTimezone();
+    this._wallOriginMs = 0;
+    this._perfOrigin = 0;
     this._chSamples = { 1: [], 2: [], 3: [], 4: [] };
     this._chDtUs = { 1: 1000, 2: 1000, 3: 1000, 4: 1000 };
     this._totalSamples = 0;
@@ -323,6 +361,7 @@ class Recorder {
       trial_no: this._trial_no,
       label: this._label,
       session_timestamp: this._session_timestamp,
+      timezone: this._timezone,
     };
   }
 
@@ -357,6 +396,9 @@ class Recorder {
     this._trial_no = Math.max(1, Math.min(5, parseInt(trial_no, 10) || 1));
     this._label = (label || this._exercise).trim() || this._exercise;
     this._session_timestamp = new Date().toISOString();
+    this._timezone = getSystemTimezone();
+    this._wallOriginMs = Date.now();
+    this._perfOrigin = performance.now();
     this._recording = true;
   }
 
@@ -364,25 +406,40 @@ class Recorder {
     this._recording = false;
   }
 
-  recordPacket(packet) {
+  recordPacket(packet, hostRxPerf = performance.now()) {
     if (!this._recording) return;
     try {
       const slave = parseInt(packet.slave ?? -1, 10);
-      const t0Us = packetT0Us(packet);
+      const t0Ms = packetT0Ms(packet);
+      const t0Us = t0Ms * 1000;
       const dt_us = parseInt(packet.dt_us ?? 1000, 10);
+      const dtMs = dt_us / 1000;
       const mv = packet.mv;
       const channel = SLAVE_TO_CHANNEL[slave];
       if (channel == null || !Array.isArray(mv) || !mv.length) return;
 
-      const frameBase = packet.frame_id ?? packet.frame_id_start ?? packet.fid ?? null;
+      const frameBase = packet.frame_id_start ?? packet.frame_id ?? packet.fid ?? null;
 
       if (dt_us > 0) this._chDtUs[channel] = dt_us;
 
-      for (let i = 0; i < mv.length; i++) {
+      const count = mv.length;
+      for (let i = 0; i < count; i++) {
         const tsUs = t0Us + i * dt_us;
         const valMv = Math.round((parseInt(mv[i], 10) / 4095) * 3300 * 10) / 10;
         const syncKey = frameBase != null ? Number(frameBase) * 10000 + i : null;
-        this._chSamples[channel].push({ tsUs, valMv, syncKey });
+        // Host wall clock: last sample in batch ≈ receive time; earlier samples stepped back by dt
+        const ageMs = (count - 1 - i) * dtMs;
+        const samplePerf = hostRxPerf - ageMs;
+        const wallMs = this._wallOriginMs + (samplePerf - this._perfOrigin);
+        this._chSamples[channel].push({
+          tsUs,
+          valMv,
+          syncKey,
+          espT0Ms: t0Ms + Math.round(i * dtMs),
+          wallMs,
+          wallIso: wallMsToIso(wallMs),
+          wallLocal: wallMsToLocal(wallMs, this._timezone),
+        });
         this._totalSamples++;
       }
     } catch { /* ignore malformed */ }
@@ -432,6 +489,10 @@ class Recorder {
       tsUs: s.tsUs,
       valMv: chValues[i],
       syncKey: s.syncKey,
+      espT0Ms: s.espT0Ms,
+      wallMs: s.wallMs,
+      wallIso: s.wallIso,
+      wallLocal: s.wallLocal,
     }));
   }
 
@@ -457,7 +518,10 @@ class Recorder {
         let refTs = null;
         for (const c of active) {
           const hit = byKey[c].get(key);
-          row.cells[c] = hit ? { tsUs: hit.tsUs, valMv: hit.valMv } : null;
+          row.cells[c] = hit ? {
+            tsUs: hit.tsUs, valMv: hit.valMv,
+            wallIso: hit.wallIso, wallLocal: hit.wallLocal,
+          } : null;
           if (hit && refTs == null) refTs = hit.tsUs;
         }
         row.refTsUs = refTs;
@@ -481,7 +545,12 @@ class Recorder {
       let any = false;
       for (const c of active) {
         const hit = nearestSample(prepared[c], T, tolerance);
-        cells[c] = hit ? { tsUs: hit.tsUs, valMv: hit.valMv } : null;
+        cells[c] = hit ? {
+          tsUs: hit.tsUs,
+          valMv: hit.valMv,
+          wallIso: hit.wallIso,
+          wallLocal: hit.wallLocal,
+        } : null;
         if (hit) any = true;
       }
       if (any) {
@@ -502,6 +571,7 @@ class Recorder {
       this._trial_no,
       this._session_timestamp,
       this._label,
+      this._timezone,
     ];
   }
 
@@ -517,10 +587,13 @@ class Recorder {
 
     const header = [
       'participant', 'sex', 'age', 'weight_kg', 'height_cm',
-      'exercise', 'trial_no', 'session_timestamp', 'label',
+      'exercise', 'trial_no', 'session_timestamp', 'label', 'timezone',
       'sample_index', 'ref_timestamp_us', 'rel_time_ms',
+      'recorded_at_local', 'recorded_at_iso',
     ];
-    for (const c of active) header.push(`ts_ch${c}_us`, `ch${c}_${filterNote}`);
+    for (const c of active) {
+      header.push(`esp_t0_ch${c}_ms`, `ts_ch${c}_us`, `ch${c}_${filterNote}`);
+    }
     header.push('channels_present');
 
     const rows = [header.join(',')];
@@ -528,15 +601,24 @@ class Recorder {
       const relMs = row.relTimeMs != null
         ? Math.round(row.relTimeMs * 1000) / 1000
         : Math.round((row.refTsUs - tMin) / 1000 * 1000) / 1000;
+      const refCell = active.map(c => row.cells[c]).find(Boolean);
       const present = [];
-      const data = [...this._metaRowPrefix(), row.index, row.refTsUs, relMs];
+      const data = [
+        ...this._metaRowPrefix(),
+        row.index,
+        row.refTsUs,
+        relMs,
+        refCell?.wallLocal ?? '',
+        refCell?.wallIso ?? '',
+      ];
       for (const c of active) {
         const cell = row.cells[c];
         if (cell) {
-          data.push(cell.tsUs, Math.round(cell.valMv * 100) / 100);
+          const espT0 = this._chSamples[c].find(s => s.tsUs === cell.tsUs)?.espT0Ms ?? '';
+          data.push(espT0, cell.tsUs, Math.round(cell.valMv * 100) / 100);
           present.push(c);
         } else {
-          data.push('', '');
+          data.push('', '', '');
         }
       }
       data.push(present.join('|') || '');
@@ -554,8 +636,10 @@ class Recorder {
     const filterNote = applyFilter ? 'filtered' : 'raw';
     const header = [
       'participant', 'sex', 'age', 'weight_kg', 'height_cm',
-      'exercise', 'trial_no', 'session_timestamp', 'label',
-      'channel', 'timestamp_us', `value_mV_${filterNote}`, 'sync_key',
+      'exercise', 'trial_no', 'session_timestamp', 'label', 'timezone',
+      'channel', 'esp_t0_ms', 'hw_timestamp_us',
+      'recorded_at_local', 'recorded_at_iso',
+      `value_mV_${filterNote}`, 'sync_key',
     ];
     const rows = [header.join(',')];
     const prefix = this._metaRowPrefix();
@@ -567,7 +651,10 @@ class Recorder {
         rows.push([
           ...prefix,
           c,
+          samples[i].espT0Ms,
           samples[i].tsUs,
+          samples[i].wallLocal,
+          samples[i].wallIso,
           Math.round(vals[i] * 100) / 100,
           samples[i].syncKey ?? '',
         ].join(','));
@@ -600,7 +687,7 @@ const EmgEngine = {
     this._emit();
   },
 
-  onPacket(packet) {
+  onPacket(packet, hostRxPerf) {
     try {
       const slave = parseInt(packet.slave ?? -1, 10);
       const mv = packet.mv;
@@ -618,7 +705,7 @@ const EmgEngine = {
 
       const filtered = this._filterBank.process(channelId, samples);
       this._channels[channelId].ingest(filtered);
-      this.recorder.recordPacket(packet);
+      this.recorder.recordPacket(packet, hostRxPerf ?? performance.now());
     } catch { /* ignore */ }
   },
 
@@ -697,3 +784,4 @@ const EmgEngine = {
 
 window.EmgEngine = EmgEngine;
 window.RESEARCH = RESEARCH;
+window.getSystemTimezone = getSystemTimezone;

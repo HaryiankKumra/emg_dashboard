@@ -404,7 +404,8 @@ function formatBytes(bytes) {
 }
 
 function updateClock() {
-  dom.footerTime.textContent = new Date().toLocaleString();
+  const tz = typeof getSystemTimezone === 'function' ? getSystemTimezone() : '';
+  dom.footerTime.textContent = new Date().toLocaleString() + (tz ? ` (${tz})` : '');
 }
 
 function showCompatBanner() {
@@ -453,9 +454,9 @@ SerialWeb.onDisconnect = () => {
 
   toast(
     SerialWeb.isSupported()
-      ? 'Ready. Plug in ESP32, click Connect, pick the USB port.'
+      ? `Ready. Timestamps use your PC clock (${getSystemTimezone()}). Connect at 921600 baud.`
       : 'This browser cannot use Web Serial.',
     'info',
-    5000
+    6000
   );
 })();

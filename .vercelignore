@@ -1,0 +1,9 @@
+backend/
+*.tex
+*.bib
+emg_plot.png
+emg_gui.png
+hardware.tex
+emg_report.tex
+ref.bib
+netlify.toml

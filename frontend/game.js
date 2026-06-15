@@ -1253,7 +1253,7 @@ function connectEMG() {
   window.addEventListener('emg-update', onEmgUpdate);
 
   if (typeof SerialWeb !== 'undefined' && SerialWeb.isSupported()) {
-    SerialWeb.reconnectGranted(115200).then(function(ok) {
+    SerialWeb.reconnectGranted(921600).then(function(ok) {
       if (ok) {
         $('ws-dot').className = 'on';
         $('ws-lbl').textContent = 'EMG LINKED';

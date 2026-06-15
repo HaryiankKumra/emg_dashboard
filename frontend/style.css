@@ -790,6 +790,14 @@ canvas { display: block; }
   min-width: 200px;
 }
 
+.baud-hint {
+  color: var(--accent-amber);
+  font-size: 11px;
+  align-self: flex-end;
+  padding-bottom: 4px;
+  white-space: nowrap;
+}
+
 .session-row {
   flex-wrap: wrap;
   gap: 10px 14px;

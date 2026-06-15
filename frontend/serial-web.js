@@ -10,7 +10,7 @@ const SerialWeb = {
   _reader: null,
   _reading: false,
   connected: false,
-  baud: 115200,
+  baud: 921600,
 
   stats: {
     rx_packets: 0,
@@ -50,7 +50,7 @@ const SerialWeb = {
    * Open serial port. If `existingPort` is omitted, shows the browser port picker.
    * Must be called from a user gesture (button click).
    */
-  async connect(baudRate = 115200, existingPort = null) {
+  async connect(baudRate = 921600, existingPort = null) {
     if (!this.isSupported()) {
       throw new Error(this.supportMessage());
     }
@@ -90,7 +90,7 @@ const SerialWeb = {
   },
 
   /** Reconnect to a previously granted port (no picker). */
-  async reconnectGranted(baudRate = 115200) {
+  async reconnectGranted(baudRate = 921600) {
     const ports = await this.getGrantedPorts();
     if (!ports.length) return false;
     await this.connect(baudRate, ports[0]);

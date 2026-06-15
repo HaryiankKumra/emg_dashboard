@@ -236,6 +236,59 @@ class ChannelData {
   }
 }
 
+// ── Recorder helpers ───────────────────────────────────────────────────────────
+
+/** ESP32 master JSON sends t0 in milliseconds (see hardware.tex). */
+function packetT0Us(packet) {
+  if (packet.t0_us != null) return parseInt(packet.t0_us, 10);
+  if (packet.t0_ms != null) return parseInt(packet.t0_ms, 10) * 1000;
+  return parseInt(packet.t0 ?? 0, 10) * 1000;
+}
+
+function estimateMedianDtUs(chSamples, active) {
+  const estimates = [];
+  for (const c of active) {
+    const samples = chSamples[c];
+    if (samples.length < 2) continue;
+    const diffs = [];
+    for (let j = 1; j < Math.min(samples.length, 50); j++) {
+      const d = samples[j].tsUs - samples[j - 1].tsUs;
+      if (d > 0) diffs.push(d);
+    }
+    if (diffs.length) {
+      diffs.sort((a, b) => a - b);
+      estimates.push(diffs[Math.floor(diffs.length / 2)]);
+    }
+  }
+  if (!estimates.length) return 1000;
+  estimates.sort((a, b) => a - b);
+  return estimates[Math.floor(estimates.length / 2)];
+}
+
+function nearestSample(samples, targetTs, toleranceUs) {
+  if (!samples.length) return null;
+  let lo = 0;
+  let hi = samples.length - 1;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (samples[mid].tsUs < targetTs) lo = mid + 1;
+    else hi = mid;
+  }
+  const candidates = [];
+  if (lo > 0) candidates.push(samples[lo - 1]);
+  if (lo < samples.length) candidates.push(samples[lo]);
+  let best = null;
+  let bestDiff = Infinity;
+  for (const s of candidates) {
+    const diff = Math.abs(s.tsUs - targetTs);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = s;
+    }
+  }
+  return bestDiff <= toleranceUs ? best : null;
+}
+
 // ── Recorder ─────────────────────────────────────────────────────────────────
 
 class Recorder {
@@ -315,89 +368,210 @@ class Recorder {
     if (!this._recording) return;
     try {
       const slave = parseInt(packet.slave ?? -1, 10);
-      const t0 = parseInt(packet.t0 ?? 0, 10);
+      const t0Us = packetT0Us(packet);
       const dt_us = parseInt(packet.dt_us ?? 1000, 10);
       const mv = packet.mv;
       const channel = SLAVE_TO_CHANNEL[slave];
       if (channel == null || !Array.isArray(mv) || !mv.length) return;
 
+      const frameBase = packet.frame_id ?? packet.frame_id_start ?? packet.fid ?? null;
+
       if (dt_us > 0) this._chDtUs[channel] = dt_us;
 
       for (let i = 0; i < mv.length; i++) {
-        const ts = t0 + i * dt_us;
-        const mvVal = Math.round((parseInt(mv[i], 10) / 4095) * 3300 * 10) / 10;
-        this._chSamples[channel].push([ts, mvVal]);
+        const tsUs = t0Us + i * dt_us;
+        const valMv = Math.round((parseInt(mv[i], 10) / 4095) * 3300 * 10) / 10;
+        const syncKey = frameBase != null ? Number(frameBase) * 10000 + i : null;
+        this._chSamples[channel].push({ tsUs, valMv, syncKey });
         this._totalSamples++;
       }
     } catch { /* ignore malformed */ }
   }
 
-  toCSV(applyFilter = true) {
-    const ch = this._chSamples;
-    const dt_us = this._chDtUs;
-    const active = [1, 2, 3, 4].filter(c => ch[c].length);
-    if (!active.length) return 'sample_index,rel_time_ms\n';
+  /** Per-channel counts and sync quality for diagnostics. */
+  getDiagnostics() {
+    const active = [1, 2, 3, 4].filter(c => this._chSamples[c].length);
+    if (!active.length) return { active: [], counts: {}, mismatch_pct: 0 };
 
-    const nRows = Math.max(...active.map(c => ch[c].length));
-    const dtEstimates = [];
+    const counts = {};
+    const rates = {};
     for (const c of active) {
-      const samples = ch[c];
-      if (samples.length >= 2) {
-        const diffs = [];
-        for (let j = 1; j < Math.min(samples.length, 20); j++) {
-          if (samples[j][0] > samples[j - 1][0]) {
-            diffs.push(samples[j][0] - samples[j - 1][0]);
-          }
-        }
-        if (diffs.length) dtEstimates.push(diffs.reduce((a, b) => a + b, 0) / diffs.length);
+      counts[c] = this._chSamples[c].length;
+      const s = this._chSamples[c];
+      if (s.length >= 2) {
+        const spanUs = s[s.length - 1].tsUs - s[0].tsUs;
+        rates[c] = spanUs > 0 ? Math.round((s.length - 1) / (spanUs / 1e6)) : 0;
+      } else {
+        rates[c] = 0;
       }
     }
-    const medianDtUs = dtEstimates.length
-      ? dtEstimates.reduce((a, b) => a + b, 0) / dtEstimates.length
-      : 1000;
+    const vals = Object.values(counts);
+    const maxC = Math.max(...vals);
+    const minC = Math.min(...vals);
+    const mismatch_pct = maxC > 0 ? Math.round((maxC - minC) / maxC * 1000) / 10 : 0;
 
+    return { active, counts, rates, mismatch_pct, median_dt_us: estimateMedianDtUs(this._chSamples, active) };
+  }
+
+  _prepareChannelValues(active, applyFilter) {
     const chValues = {};
     for (const c of active) {
-      const raw = ch[c].map(([, v]) => v);
+      const raw = this._chSamples[c].map(s => s.valMv);
       if (applyFilter) {
-        const fs = 1_000_000 / (dt_us[c] || 1000);
+        const fs = 1_000_000 / (this._chDtUs[c] || 1000);
         chValues[c] = ChannelFilter.applyOffline(raw, fs);
       } else {
         chValues[c] = raw;
       }
     }
+    return chValues;
+  }
 
+  _samplesWithValues(channel, chValues) {
+    return this._chSamples[channel].map((s, i) => ({
+      tsUs: s.tsUs,
+      valMv: chValues[i],
+      syncKey: s.syncKey,
+    }));
+  }
+
+  /** Align channels by hardware syncKey (frame_id) when firmware provides it. */
+  _buildAlignedRows(active, chValues, medianDtUs) {
+    const hasSync = active.every(c =>
+      this._chSamples[c].length > 0 &&
+      this._chSamples[c].every(s => s.syncKey != null)
+    );
+
+    if (hasSync) {
+      const keySet = new Set();
+      for (const c of active) {
+        for (const s of this._chSamples[c]) keySet.add(s.syncKey);
+      }
+      const keys = Array.from(keySet).sort((a, b) => a - b);
+      const byKey = {};
+      for (const c of active) {
+        byKey[c] = new Map(this._samplesWithValues(c, chValues[c]).map(s => [s.syncKey, s]));
+      }
+      return keys.map((key, idx) => {
+        const row = { index: idx, relTimeMs: null, cells: {} };
+        let refTs = null;
+        for (const c of active) {
+          const hit = byKey[c].get(key);
+          row.cells[c] = hit ? { tsUs: hit.tsUs, valMv: hit.valMv } : null;
+          if (hit && refTs == null) refTs = hit.tsUs;
+        }
+        row.refTsUs = refTs;
+        return row;
+      });
+    }
+
+    // Timestamp grid alignment (honest: empty cell if no sample within ±dt/2)
+    const tolerance = medianDtUs / 2;
+    const tMin = Math.min(...active.map(c => this._chSamples[c][0].tsUs));
+    const tMax = Math.max(...active.map(c => this._chSamples[c][this._chSamples[c].length - 1].tsUs));
+    const prepared = {};
+    for (const c of active) {
+      prepared[c] = this._samplesWithValues(c, chValues[c]);
+    }
+
+    const rows = [];
+    let idx = 0;
+    for (let T = tMin; T <= tMax + medianDtUs / 2; T += medianDtUs) {
+      const cells = {};
+      let any = false;
+      for (const c of active) {
+        const hit = nearestSample(prepared[c], T, tolerance);
+        cells[c] = hit ? { tsUs: hit.tsUs, valMv: hit.valMv } : null;
+        if (hit) any = true;
+      }
+      if (any) {
+        rows.push({ index: idx++, refTsUs: T, relTimeMs: (T - tMin) / 1000, cells });
+      }
+    }
+    return rows;
+  }
+
+  _metaRowPrefix() {
+    return [
+      this._participant,
+      this._sex,
+      this._age,
+      this._weight_kg,
+      this._height_cm,
+      this._exercise,
+      this._trial_no,
+      this._session_timestamp,
+      this._label,
+    ];
+  }
+
+  toCSV(applyFilter = true) {
+    const active = [1, 2, 3, 4].filter(c => this._chSamples[c].length);
+    if (!active.length) return 'sample_index,rel_time_ms\n';
+
+    const medianDtUs = estimateMedianDtUs(this._chSamples, active);
+    const chValues = this._prepareChannelValues(active, applyFilter);
+    const aligned = this._buildAlignedRows(active, chValues, medianDtUs);
+    const tMin = aligned.length ? (aligned[0].refTsUs ?? 0) : 0;
     const filterNote = applyFilter ? 'filtered' : 'raw';
-    const metaCols = [
+
+    const header = [
       'participant', 'sex', 'age', 'weight_kg', 'height_cm',
       'exercise', 'trial_no', 'session_timestamp', 'label',
-      'sample_index', 'rel_time_ms',
+      'sample_index', 'ref_timestamp_us', 'rel_time_ms',
     ];
-    const header = [...metaCols];
     for (const c of active) header.push(`ts_ch${c}_us`, `ch${c}_${filterNote}`);
+    header.push('channels_present');
 
     const rows = [header.join(',')];
-    for (let i = 0; i < nRows; i++) {
-      const relTimeMs = Math.round(i * medianDtUs / 1000 * 1000) / 1000;
-      const row = [
-        this._participant,
-        this._sex,
-        this._age,
-        this._weight_kg,
-        this._height_cm,
-        this._exercise,
-        this._trial_no,
-        this._session_timestamp,
-        this._label,
-        i,
-        relTimeMs,
-      ];
+    for (const row of aligned) {
+      const relMs = row.relTimeMs != null
+        ? Math.round(row.relTimeMs * 1000) / 1000
+        : Math.round((row.refTsUs - tMin) / 1000 * 1000) / 1000;
+      const present = [];
+      const data = [...this._metaRowPrefix(), row.index, row.refTsUs, relMs];
       for (const c of active) {
-        const tsUs = i < ch[c].length ? ch[c][i][0] : '';
-        const val = i < chValues[c].length ? Math.round(chValues[c][i] * 100) / 100 : '';
-        row.push(tsUs, val);
+        const cell = row.cells[c];
+        if (cell) {
+          data.push(cell.tsUs, Math.round(cell.valMv * 100) / 100);
+          present.push(c);
+        } else {
+          data.push('', '');
+        }
       }
-      rows.push(row.join(','));
+      data.push(present.join('|') || '');
+      rows.push(data.join(','));
+    }
+    return rows.join('\n');
+  }
+
+  /** Long-format CSV: one row per sample — no cross-channel alignment assumptions. */
+  toLongCSV(applyFilter = true) {
+    const active = [1, 2, 3, 4].filter(c => this._chSamples[c].length);
+    if (!active.length) return 'channel,timestamp_us,value_mV\n';
+
+    const chValues = this._prepareChannelValues(active, applyFilter);
+    const filterNote = applyFilter ? 'filtered' : 'raw';
+    const header = [
+      'participant', 'sex', 'age', 'weight_kg', 'height_cm',
+      'exercise', 'trial_no', 'session_timestamp', 'label',
+      'channel', 'timestamp_us', `value_mV_${filterNote}`, 'sync_key',
+    ];
+    const rows = [header.join(',')];
+    const prefix = this._metaRowPrefix();
+
+    for (const c of active) {
+      const samples = this._chSamples[c];
+      const vals = chValues[c];
+      for (let i = 0; i < samples.length; i++) {
+        rows.push([
+          ...prefix,
+          c,
+          samples[i].tsUs,
+          Math.round(vals[i] * 100) / 100,
+          samples[i].syncKey ?? '',
+        ].join(','));
+      }
     }
     return rows.join('\n');
   }
@@ -464,6 +638,7 @@ const EmgEngine = {
       recording_label: this.recorder.label,
       filter_enabled: this.filterEnabled,
       stats: { ...this._stats },
+      recording_diag: this.recorder.isRecording ? this.recorder.getDiagnostics() : null,
       channels: this.getSnapshot(),
     };
     window.dispatchEvent(new CustomEvent('emg-update', { detail }));
@@ -492,7 +667,16 @@ const EmgEngine = {
   downloadRecorderCSV(applyFilter = true) {
     if (this.recorder.sampleCount === 0) return false;
     const csv = this.recorder.toCSV(applyFilter);
-    const suffix = applyFilter ? 'filtered' : 'raw';
+    const suffix = applyFilter ? 'aligned_filtered' : 'aligned_raw';
+    const name = `${this.recorder.filenameBase()}_${suffix}.csv`;
+    EmgEngine._downloadText(csv, name);
+    return true;
+  },
+
+  downloadRecorderLongCSV(applyFilter = true) {
+    if (this.recorder.sampleCount === 0) return false;
+    const csv = this.recorder.toLongCSV(applyFilter);
+    const suffix = applyFilter ? 'long_filtered' : 'long_raw';
     const name = `${this.recorder.filenameBase()}_${suffix}.csv`;
     EmgEngine._downloadText(csv, name);
     return true;

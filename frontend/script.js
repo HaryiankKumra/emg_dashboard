@@ -44,6 +44,7 @@ const dom = {
   recStopBtn:      $('rec-stop-btn'),
   downloadBtn:     $('download-btn'),
   downloadRawBtn:  $('download-raw-btn'),
+  downloadLongBtn: $('download-long-btn'),
   connStatus:      $('conn-status'),
   statusDot:       $('status-dot'),
   statusText:      $('status-text'),
@@ -322,15 +323,30 @@ function startRecording() {
   state.hasData = false;
   dom.downloadBtn.disabled = true;
   dom.downloadRawBtn.disabled = true;
+  dom.downloadLongBtn.disabled = true;
 }
 
 function stopRecording() {
   EmgEngine.recorder.stop();
   const n = EmgEngine.recorder.sampleCount;
-  toast(`⏹ Stopped — ${n} samples · "${EmgEngine.recorder.label}"`, 'success', 5000);
+  const diag = EmgEngine.recorder.getDiagnostics();
+
+  let msg = `⏹ Stopped — ${n} samples · "${EmgEngine.recorder.label}"`;
+  if (diag.active.length > 1) {
+    const parts = diag.active.map(c => `CH${c}:${diag.counts[c]}@${diag.rates[c]}Hz`).join(' · ');
+    msg += ` · ${parts}`;
+    if (diag.mismatch_pct > 2) {
+      toast(
+        `⚠ Channel mismatch ${diag.mismatch_pct}% — use 921600 baud. Check ts_ch1 vs ts_ch2 in CSV. Long CSV has every sample.`,
+        'warning', 8000
+      );
+    }
+  }
+  toast(msg, 'success', 6000);
   state.hasData = n > 0;
   dom.downloadBtn.disabled = !state.hasData;
   dom.downloadRawBtn.disabled = !state.hasData;
+  dom.downloadLongBtn.disabled = !state.hasData;
 }
 
 function downloadCSV(filtered = true) {
@@ -339,7 +355,16 @@ function downloadCSV(filtered = true) {
     toast('No data to download.', 'warning');
     return;
   }
-  toast(filtered ? 'Filtered CSV downloaded.' : 'Raw CSV downloaded.', 'success');
+  toast(filtered ? 'Time-aligned filtered CSV downloaded.' : 'Time-aligned raw CSV downloaded.', 'success');
+}
+
+function downloadLongCSV() {
+  const ok = EmgEngine.downloadRecorderLongCSV(true);
+  if (!ok) {
+    toast('No data to download.', 'warning');
+    return;
+  }
+  toast('Long-format CSV downloaded (every sample, no alignment).', 'success');
 }
 
 function toggleFilter() {
@@ -402,6 +427,7 @@ dom.recStartBtn.addEventListener('click', startRecording);
 dom.recStopBtn.addEventListener('click', stopRecording);
 dom.downloadBtn.addEventListener('click', () => downloadCSV(true));
 dom.downloadRawBtn.addEventListener('click', () => downloadCSV(false));
+dom.downloadLongBtn.addEventListener('click', downloadLongCSV);
 
 window.addEventListener('emg-update', onEmgUpdate);
 

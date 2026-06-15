@@ -43,11 +43,17 @@ var EMG = {
 // ── Session config (from setup form) ─────────────────
 var SESSION = {
   participantName: '',
+  sex: 'male',
+  age: 25,
+  weight_kg: 70,
+  height_cm: 170,
+  exercise: 'squat',
+  trial_no: 1,
   sessionId: '',
   numHurdles: 10,
-  attemptTimeLimit: 5,   // seconds per attempt
-  threshold: 30,         // mV RMS — must reach this to jump
-  baseline: 4,           // mV RMS — resting level
+  attemptTimeLimit: 5,
+  threshold: 30,
+  baseline: 4,
   calibrated: false,
 };
 
@@ -748,12 +754,27 @@ function onLanded() {
 
 function makeAttemptRecord(outcome) {
   var now = Date.now();
+  var duration = now - GAME.currentAttemptStart;
+  var trace = waveHistory.slice();
+  var meanEMG = 0;
+  if (trace.length) {
+    meanEMG = trace.reduce(function(s, v) { return s + v; }, 0) / trace.length;
+  }
   return {
-    startTime:       GAME.currentAttemptStart - sessionStartTime,
-    endTime:         now - sessionStartTime,
-    outcome:         outcome,
-    peakEMG:         GAME.currentPeakEMG,
-    timeToThreshold: outcome === 'success' ? (now - GAME.currentAttemptStart) : null,
+    startTime_ms:        GAME.currentAttemptStart - sessionStartTime,
+    endTime_ms:          now - sessionStartTime,
+    duration_ms:         duration,
+    outcome:             outcome,
+    peakEMG_mV:          round2(GAME.currentPeakEMG),
+    meanEMG_mV:          round2(meanEMG),
+    timeToThreshold_ms:  outcome === 'success' ? duration : null,
+    channel:             EMG.channel,
+    threshold_mV:        round2(SESSION.threshold),
+    baseline_mV:         round2(SESSION.baseline),
+    emg_trace_hz:        trace.length && duration > 0
+      ? round2(trace.length / (duration / 1000))
+      : null,
+    emg_trace_mV:        trace,
   };
 }
 
@@ -797,6 +818,7 @@ function hideFlexOverlay() {
 
 function completeSession() {
   GAME.phase = 'results';
+  stopGameEMGRecording();
   buildResults();
   showOverlay('results-overlay');
 }
@@ -810,20 +832,24 @@ function buildResults() {
   var peaks = HURDLE_LOG.map(function(h) {
     if (!h) return 0;
     var s = h.attempts.find(function(a) { return a.outcome === 'success'; });
-    return s ? s.peakEMG : 0;
+    return s ? s.peakEMG_mV : 0;
   });
   var avgPeak = peaks.reduce(function(s, v) { return s + v; }, 0) / peaks.length;
 
   // Summary cards
   $('results-sid').textContent = 'SESSION · ' + SESSION.sessionId;
   $('results-summary').innerHTML =
+    rCard(SESSION.participantName || '—', 'PARTICIPANT') +
+    rCard(SESSION.sex + ' · ' + SESSION.age + 'y', 'SEX / AGE') +
+    rCard(SESSION.exercise.replace('_', ' '), 'EXERCISE') +
+    rCard('Trial ' + SESSION.trial_no, 'TRIAL') +
     rCard(SESSION.numHurdles, 'HURDLES CLEARED') +
     rCard(totalAttempts, 'TOTAL ATTEMPTS') +
     rCard(totalTime.toFixed(1) + 's', 'SESSION TIME') +
     rCard(efficiency + '%', 'EFFICIENCY') +
     rCard(Math.round(SESSION.threshold) + ' mV', 'TARGET THRESHOLD') +
     rCard(Math.round(avgPeak) + ' mV', 'AVG PEAK EMG') +
-    rCard(SESSION.participantName || '—', 'PARTICIPANT') +
+    rCard(SESSION.weight_kg + ' kg', 'WEIGHT') +
     rCard(SESSION.attemptTimeLimit + 's', 'TIME LIMIT / HURDLE');
 
   // Per-hurdle table
@@ -834,8 +860,9 @@ function buildResults() {
     if (!h) continue;
     var nattempts  = h.attempts.length;
     var success    = h.attempts.find(function(a) { return a.outcome === 'success'; });
-    var peakEMG    = success ? Math.round(success.peakEMG) : '—';
-    var timeToAct  = success && success.timeToThreshold ? Math.round(success.timeToThreshold) : '—';
+    var peakEMG    = success ? Math.round(success.peakEMG_mV) : '—';
+    var timeToAct  = success && success.timeToThreshold_ms != null
+      ? Math.round(success.timeToThreshold_ms) : '—';
     var clearedAt  = h.completedAt ? (h.completedAt / 1000).toFixed(1) + 's' : '—';
     var effTxt     = nattempts === 1 ? '✓ First try' : nattempts + ' attempts';
     var effCls     = nattempts === 1 ? 'good' : nattempts > 3 ? 'warn' : '';
@@ -865,15 +892,28 @@ function exportJSON() {
   var totalTime = (Date.now() - sessionStartTime) / 1000;
 
   var data = {
+    schema_version: '2.0',
     sessionId:       SESSION.sessionId,
-    participantName: SESSION.participantName || 'anonymous',
     timestamp:       new Date().toISOString(),
+    participant: {
+      id:          SESSION.participantName || 'anonymous',
+      sex:         SESSION.sex,
+      age:         SESSION.age,
+      weight_kg:     SESSION.weight_kg,
+      height_cm:     SESSION.height_cm,
+    },
     protocol: {
+      exercise:            SESSION.exercise,
+      trial_no:            SESSION.trial_no,
       numHurdles:          SESSION.numHurdles,
       attemptTimeLimit_s:  SESSION.attemptTimeLimit,
       threshold_mV:        round2(SESSION.threshold),
       baseline_mV:         round2(SESSION.baseline),
       hurdleVisualH_px:    Math.round(hurdleVisualH()),
+    },
+    emg_recording: {
+      sample_count:      EmgEngine.recorder ? EmgEngine.recorder.sampleCount : 0,
+      session_timestamp: EmgEngine.recorder ? EmgEngine.recorder.getMeta().session_timestamp : null,
     },
     summary: {
       totalAttempts:   totalAttempts,
@@ -883,17 +923,24 @@ function exportJSON() {
     hurdles: HURDLE_LOG.map(function(h, i) {
       if (!h) return null;
       return {
-        hurdle:        i + 1,
-        totalAttempts: h.attempts.length,
+        hurdle:         i + 1,
+        totalAttempts:  h.attempts.length,
         completedAt_ms: h.completedAt,
-        attempts: h.attempts.map(function(a) {
+        attempts: h.attempts.map(function(a, idx) {
           return {
+            attempt_no:          idx + 1,
             outcome:             a.outcome,
-            startTime_ms:        a.startTime,
-            endTime_ms:          a.endTime,
-            duration_ms:         a.endTime - a.startTime,
-            peakEMG_mV:          round2(a.peakEMG),
-            timeToThreshold_ms:  a.timeToThreshold,
+            startTime_ms:        a.startTime_ms,
+            endTime_ms:          a.endTime_ms,
+            duration_ms:         a.duration_ms,
+            peakEMG_mV:          a.peakEMG_mV,
+            meanEMG_mV:          a.meanEMG_mV,
+            timeToThreshold_ms:  a.timeToThreshold_ms,
+            channel:             a.channel,
+            threshold_mV:        a.threshold_mV,
+            baseline_mV:         a.baseline_mV,
+            emg_trace_hz:        a.emg_trace_hz,
+            emg_trace_mV:        a.emg_trace_mV,
           };
         }),
       };
@@ -903,11 +950,59 @@ function exportJSON() {
   var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   var url  = URL.createObjectURL(blob);
   var a    = document.createElement('a');
-  a.href = url; a.download = 'myohurdle_' + SESSION.sessionId + '.json';
+  a.href = url;
+  a.download = SESSION.participantName + '_trial' + SESSION.trial_no + '_' + SESSION.exercise + '_protocol.json';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function exportAttemptsCSV() {
+  var header = [
+    'participant', 'sex', 'age', 'weight_kg', 'height_cm', 'exercise', 'trial_no',
+    'session_id', 'hurdle', 'attempt_no', 'outcome', 'peak_emg_mV', 'mean_emg_mV',
+    'time_to_threshold_ms', 'duration_ms', 'channel', 'threshold_mV', 'baseline_mV',
+  ];
+  var rows = [header.join(',')];
+
+  HURDLE_LOG.forEach(function(h, hi) {
+    if (!h) return;
+    h.attempts.forEach(function(a, ai) {
+      rows.push([
+        SESSION.participantName,
+        SESSION.sex,
+        SESSION.age,
+        SESSION.weight_kg,
+        SESSION.height_cm,
+        SESSION.exercise,
+        SESSION.trial_no,
+        SESSION.sessionId,
+        hi + 1,
+        ai + 1,
+        a.outcome,
+        a.peakEMG_mV,
+        a.meanEMG_mV,
+        a.timeToThreshold_ms != null ? a.timeToThreshold_ms : '',
+        a.duration_ms,
+        a.channel,
+        a.threshold_mV,
+        a.baseline_mV,
+      ].join(','));
+    });
+  });
+
+  if (rows.length <= 1) return;
+
+  var name = SESSION.participantName + '_trial' + SESSION.trial_no + '_' + SESSION.exercise + '_attempts.csv';
+  EmgEngine._downloadText(rows.join('\n'), name);
+}
+
+function exportGameEMGCSV(filtered) {
+  if (typeof EmgEngine === 'undefined') return;
+  if (!EmgEngine.downloadRecorderCSV(filtered)) {
+    alert('No EMG samples recorded for this session. Ensure the device was connected.');
+  }
 }
 
 // ══════════════════════════════════════════════════════
@@ -1018,11 +1113,47 @@ function initSetupForm() {
   $('skip-calib-btn').addEventListener('click', skipCalib);
   $('start-btn').addEventListener('click', startProtocol);
   $('export-btn').addEventListener('click', exportJSON);
+  $('export-attempts-btn').addEventListener('click', exportAttemptsCSV);
+  $('export-emg-filtered-btn').addEventListener('click', function() { exportGameEMGCSV(true); });
+  $('export-emg-raw-btn').addEventListener('click', function() { exportGameEMGCSV(false); });
   $('new-session-btn').addEventListener('click', resetToSetup);
 }
 
+function readGameSessionMeta() {
+  return {
+    participant: $('inp-name').value.trim() || 'P001',
+    sex: $('inp-sex').value || 'male',
+    age: parseInt($('inp-age').value, 10) || 25,
+    weight_kg: parseFloat($('inp-weight').value) || 70,
+    height_cm: parseFloat($('inp-height').value) || 170,
+    exercise: $('inp-exercise').value || 'squat',
+    trial_no: parseInt($('inp-trial').value, 10) || 1,
+    label: $('inp-exercise').value || 'squat',
+  };
+}
+
+function startGameEMGRecording() {
+  if (typeof EmgEngine === 'undefined') return;
+  var meta = readGameSessionMeta();
+  EmgEngine.resetFilters();
+  EmgEngine.recorder.start(meta);
+}
+
+function stopGameEMGRecording() {
+  if (typeof EmgEngine !== 'undefined' && EmgEngine.recorder.isRecording) {
+    EmgEngine.recorder.stop();
+  }
+}
+
 function startProtocol() {
-  SESSION.participantName  = $('inp-name').value.trim();
+  var meta = readGameSessionMeta();
+  SESSION.participantName  = meta.participant;
+  SESSION.sex            = meta.sex;
+  SESSION.age            = meta.age;
+  SESSION.weight_kg      = meta.weight_kg;
+  SESSION.height_cm      = meta.height_cm;
+  SESSION.exercise       = meta.exercise;
+  SESSION.trial_no       = meta.trial_no;
   SESSION.numHurdles       = parseInt($('inp-hurdles').value);
   SESSION.attemptTimeLimit = parseInt($('inp-timelimit').value);
 
@@ -1070,6 +1201,7 @@ function beginCountdown() {
       setTimeout(function() {
         hideOverlay('cd-overlay');
         sessionStartTime = Date.now();
+        startGameEMGRecording();
         GAME.charFrac = 0;
         beginApproach(0);
       }, 800);

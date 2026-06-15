@@ -9,6 +9,23 @@ const SLAVE_TO_CHANNEL = { 0: 1, 1: 2, 2: 3, 3: 4 };
 const MAX_BUFFER_SAMPLES = 5000;
 const BROADCAST_SAMPLES = 500;
 
+/** Shared research protocol options (monitor + game). */
+const RESEARCH = {
+  EXERCISES: [
+    { value: 'jump',       label: 'Jump' },
+    { value: 'squat',      label: 'Squat' },
+    { value: 'lunge',      label: 'Lunge' },
+    { value: 'deadlift',   label: 'Deadlift' },
+    { value: 'calf_raise', label: 'Calf Raise' },
+    { value: 'box_jump',   label: 'Box Jump' },
+  ],
+  TRIALS: [1, 2, 3, 4, 5],
+  SEX_OPTIONS: [
+    { value: 'male',   label: 'Male' },
+    { value: 'female', label: 'Female' },
+  ],
+};
+
 // ── Biquad IIR (RBJ cookbook) ────────────────────────────────────────────────
 
 class Biquad {
@@ -230,11 +247,35 @@ class Recorder {
     this._recording = false;
     this._label = 'testing';
     this._participant = 'testing';
+    this._sex = 'male';
+    this._age = 25;
     this._weight_kg = 70;
     this._height_cm = 170;
+    this._exercise = 'squat';
+    this._trial_no = 1;
+    this._session_timestamp = '';
     this._chSamples = { 1: [], 2: [], 3: [], 4: [] };
     this._chDtUs = { 1: 1000, 2: 1000, 3: 1000, 4: 1000 };
     this._totalSamples = 0;
+  }
+
+  getMeta() {
+    return {
+      participant: this._participant,
+      sex: this._sex,
+      age: this._age,
+      weight_kg: this._weight_kg,
+      height_cm: this._height_cm,
+      exercise: this._exercise,
+      trial_no: this._trial_no,
+      label: this._label,
+      session_timestamp: this._session_timestamp,
+    };
+  }
+
+  filenameBase() {
+    const p = (this._participant || 'anon').replace(/\s+/g, '_');
+    return `emg_${p}_trial${this._trial_no}_${this._exercise}`;
   }
 
   get isRecording() { return this._recording; }
@@ -242,13 +283,27 @@ class Recorder {
   get participant() { return this._participant; }
   get sampleCount() { return this._totalSamples; }
 
-  start({ label = 'testing', participant = 'testing', weight_kg = 70, height_cm = 170 } = {}) {
+  start({
+    label = 'testing',
+    participant = 'testing',
+    sex = 'male',
+    age = 25,
+    weight_kg = 70,
+    height_cm = 170,
+    exercise = 'squat',
+    trial_no = 1,
+  } = {}) {
     this._chSamples = { 1: [], 2: [], 3: [], 4: [] };
     this._totalSamples = 0;
-    this._label = (label || 'testing').trim() || 'testing';
     this._participant = (participant || 'testing').trim() || 'testing';
+    this._sex = sex || 'male';
+    this._age = Math.max(1, Math.min(120, parseInt(age, 10) || 25));
     this._weight_kg = weight_kg;
     this._height_cm = height_cm;
+    this._exercise = exercise || 'squat';
+    this._trial_no = Math.max(1, Math.min(5, parseInt(trial_no, 10) || 1));
+    this._label = (label || this._exercise).trim() || this._exercise;
+    this._session_timestamp = new Date().toISOString();
     this._recording = true;
   }
 
@@ -313,15 +368,29 @@ class Recorder {
     }
 
     const filterNote = applyFilter ? 'filtered' : 'raw';
-    const header = ['participant', 'weight_kg', 'height_cm', 'label', 'sample_index', 'rel_time_ms'];
+    const metaCols = [
+      'participant', 'sex', 'age', 'weight_kg', 'height_cm',
+      'exercise', 'trial_no', 'session_timestamp', 'label',
+      'sample_index', 'rel_time_ms',
+    ];
+    const header = [...metaCols];
     for (const c of active) header.push(`ts_ch${c}_us`, `ch${c}_${filterNote}`);
 
     const rows = [header.join(',')];
     for (let i = 0; i < nRows; i++) {
       const relTimeMs = Math.round(i * medianDtUs / 1000 * 1000) / 1000;
       const row = [
-        this._participant, this._weight_kg, this._height_cm,
-        this._label, i, relTimeMs,
+        this._participant,
+        this._sex,
+        this._age,
+        this._weight_kg,
+        this._height_cm,
+        this._exercise,
+        this._trial_no,
+        this._session_timestamp,
+        this._label,
+        i,
+        relTimeMs,
       ];
       for (const c of active) {
         const tsUs = i < ch[c].length ? ch[c][i][0] : '';
@@ -418,6 +487,29 @@ const EmgEngine = {
       this._rafId = null;
     }
   },
+
+  /** Trigger browser download of recorder CSV. */
+  downloadRecorderCSV(applyFilter = true) {
+    if (this.recorder.sampleCount === 0) return false;
+    const csv = this.recorder.toCSV(applyFilter);
+    const suffix = applyFilter ? 'filtered' : 'raw';
+    const name = `${this.recorder.filenameBase()}_${suffix}.csv`;
+    EmgEngine._downloadText(csv, name);
+    return true;
+  },
+
+  _downloadText(content, filename) {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
 };
 
 window.EmgEngine = EmgEngine;
+window.RESEARCH = RESEARCH;

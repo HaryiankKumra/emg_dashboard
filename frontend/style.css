@@ -789,3 +789,8 @@ canvas { display: block; }
 .web-serial-hint {
   min-width: 200px;
 }
+
+.session-row {
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}

@@ -95,14 +95,28 @@
       </button>
     </div>
 
-    <!-- Row 2: Session Info + Recording -->
+    <!-- Row 2: Participant + research metadata -->
     <div class="control-row session-row">
-      <div class="session-info-label">Session Info</div>
+      <div class="session-info-label">Research Session</div>
 
       <div class="form-group">
-        <label class="form-label" for="participant-name">Participant</label>
-        <input type="text" id="participant-name" value="testing" placeholder="Name" maxlength="40"
-               aria-label="Participant name" style="width:110px" />
+        <label class="form-label" for="participant-name">Participant ID</label>
+        <input type="text" id="participant-name" value="P001" placeholder="e.g. P001" maxlength="40"
+               aria-label="Participant ID" style="width:90px" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="participant-sex">Sex</label>
+        <select id="participant-sex" aria-label="Sex" style="width:88px">
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="participant-age">Age</label>
+        <input type="number" id="participant-age" value="25" min="10" max="100" step="1"
+               aria-label="Age in years" style="width:58px" />
       </div>
 
       <div class="form-group">
@@ -118,9 +132,26 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label" for="exercise-label">Exercise</label>
-        <input type="text" id="exercise-label" value="testing" placeholder="e.g. bicep_curl"
-               maxlength="40" aria-label="Exercise label" style="width:130px" />
+        <label class="form-label" for="exercise-type">Exercise</label>
+        <select id="exercise-type" aria-label="Exercise type" style="width:118px">
+          <option value="jump">Jump</option>
+          <option value="squat" selected>Squat</option>
+          <option value="lunge">Lunge</option>
+          <option value="deadlift">Deadlift</option>
+          <option value="calf_raise">Calf Raise</option>
+          <option value="box_jump">Box Jump</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="trial-no">Trial</label>
+        <select id="trial-no" aria-label="Trial number" style="width:62px">
+          <option value="1" selected>1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        </select>
       </div>
 
       <div class="divider-v" aria-hidden="true"></div>

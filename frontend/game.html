@@ -41,8 +41,57 @@
 
         <div class="form-grid">
           <div class="form-row">
-            <label class="form-lbl">Participant ID <span class="opt">(optional)</span></label>
-            <input id="inp-name" class="form-inp" type="text" placeholder="e.g. P001" autocomplete="off">
+            <label class="form-lbl">Participant ID</label>
+            <input id="inp-name" class="form-inp" type="text" placeholder="e.g. P001" value="P001" autocomplete="off">
+          </div>
+
+          <div class="form-row form-row-2">
+            <div>
+              <label class="form-lbl">Sex</label>
+              <select id="inp-sex" class="form-inp">
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-lbl">Age (years)</label>
+              <input id="inp-age" class="form-inp" type="number" min="10" max="100" value="25">
+            </div>
+          </div>
+
+          <div class="form-row form-row-2">
+            <div>
+              <label class="form-lbl">Weight (kg)</label>
+              <input id="inp-weight" class="form-inp" type="number" min="20" max="300" step="0.5" value="70">
+            </div>
+            <div>
+              <label class="form-lbl">Height (cm)</label>
+              <input id="inp-height" class="form-inp" type="number" min="100" max="250" step="1" value="170">
+            </div>
+          </div>
+
+          <div class="form-row form-row-2">
+            <div>
+              <label class="form-lbl">Leg Exercise</label>
+              <select id="inp-exercise" class="form-inp">
+                <option value="jump">Jump</option>
+                <option value="squat" selected>Squat</option>
+                <option value="lunge">Lunge</option>
+                <option value="deadlift">Deadlift</option>
+                <option value="calf_raise">Calf Raise</option>
+                <option value="box_jump">Box Jump</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-lbl">Trial No.</label>
+              <select id="inp-trial" class="form-inp">
+                <option value="1" selected>1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+            </div>
           </div>
 
           <div class="form-row">
@@ -221,7 +270,10 @@
       </div>
 
       <div class="results-actions">
-        <button class="btn-primary small" id="export-btn">📥 Export JSON</button>
+        <button class="btn-primary small" id="export-btn">📥 Export Protocol JSON</button>
+        <button class="btn-secondary small" id="export-attempts-btn">📊 Export Attempts CSV</button>
+        <button class="btn-secondary small" id="export-emg-filtered-btn">↓ EMG Filtered CSV</button>
+        <button class="btn-secondary small" id="export-emg-raw-btn">↓ EMG Raw CSV</button>
         <button class="btn-secondary small" id="new-session-btn">New Protocol</button>
         <a href="/" class="btn-ghost small">← Monitor</a>
       </div>

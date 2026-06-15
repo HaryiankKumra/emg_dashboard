@@ -33,9 +33,12 @@ const dom = {
   filterBtn:       $('filter-btn'),
   filtBadge:       $('filt-badge'),
   participantName:   $('participant-name'),
+  participantSex:    $('participant-sex'),
+  participantAge:    $('participant-age'),
   participantWeight: $('participant-weight'),
   participantHeight: $('participant-height'),
-  exerciseLabel:   $('exercise-label'),
+  exerciseType:      $('exercise-type'),
+  trialNo:           $('trial-no'),
   recLabelDisplay: $('rec-label-display'),
   recStartBtn:     $('rec-start-btn'),
   recStopBtn:      $('rec-stop-btn'),
@@ -295,15 +298,27 @@ async function updateGrantedInfo() {
 // RECORDING (client-side)
 // ═══════════════════════════════════════════════════
 
-function startRecording() {
-  const label = dom.exerciseLabel?.value?.trim() || 'testing';
-  const participant = dom.participantName?.value?.trim() || 'testing';
-  const weight_kg = parseFloat(dom.participantWeight?.value) || 70;
-  const height_cm = parseFloat(dom.participantHeight?.value) || 170;
+function readSessionMeta() {
+  return {
+    participant: dom.participantName?.value?.trim() || 'P001',
+    sex: dom.participantSex?.value || 'male',
+    age: parseInt(dom.participantAge?.value, 10) || 25,
+    weight_kg: parseFloat(dom.participantWeight?.value) || 70,
+    height_cm: parseFloat(dom.participantHeight?.value) || 170,
+    exercise: dom.exerciseType?.value || 'squat',
+    trial_no: parseInt(dom.trialNo?.value, 10) || 1,
+    label: dom.exerciseType?.value || 'squat',
+  };
+}
 
+function startRecording() {
+  const meta = readSessionMeta();
   EmgEngine.resetFilters();
-  EmgEngine.recorder.start({ label, participant, weight_kg, height_cm });
-  toast(`⏺ Recording — ${participant} · "${label}"`, 'success', 4000);
+  EmgEngine.recorder.start(meta);
+  toast(
+    `⏺ Recording — ${meta.participant} · ${meta.exercise} · trial ${meta.trial_no}`,
+    'success', 4000
+  );
   state.hasData = false;
   dom.downloadBtn.disabled = true;
   dom.downloadRawBtn.disabled = true;
@@ -319,20 +334,11 @@ function stopRecording() {
 }
 
 function downloadCSV(filtered = true) {
-  const csv = EmgEngine.recorder.toCSV(filtered);
-  if (!csv || csv === 'sample_index,rel_time_ms\n') {
+  const ok = EmgEngine.downloadRecorderCSV(filtered);
+  if (!ok) {
     toast('No data to download.', 'warning');
     return;
   }
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filtered ? `emg_filtered_${Date.now()}.csv` : `emg_raw_${Date.now()}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
   toast(filtered ? 'Filtered CSV downloaded.' : 'Raw CSV downloaded.', 'success');
 }
 

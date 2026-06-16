@@ -1,3 +1,4 @@
+/**
  * emg-engine.js
  * Browser-side EMG data pipeline (replaces Python data_manager + recorder + filters).
  * Emits `emg-update` CustomEvents on window at ~30 FPS.

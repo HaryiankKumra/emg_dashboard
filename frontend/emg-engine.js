@@ -1,13 +1,25 @@
-/**
  * emg-engine.js
  * Browser-side EMG data pipeline (replaces Python data_manager + recorder + filters).
  * Emits `emg-update` CustomEvents on window at ~30 FPS.
+ *
+ * Fix log (2026-06):
+ *  - Hardware sample rate (dt_us from firmware) is now used for display instead
+ *    of browser performance.now() measurements, which varied per channel due to
+ *    USB serial batching delays.
+ *  - Filter fs is now correctly 1000 Hz (matching beacon interval = 1 ms).
+ *  - LP filter cap raised to 450 Hz to cover the full 20–500 Hz MyoWare hardware
+ *    bandpass (450 Hz software LP provides a 50 Hz guard band below Nyquist).
+ *  - tsUs per sample now derived from frame_id × BEACON_INTERVAL_US so every
+ *    channel uses the SAME shared epoch → CSV alignment is exact.
  */
 'use strict';
 
 const SLAVE_TO_CHANNEL = { 0: 1, 1: 2, 2: 3, 3: 4 };
 const MAX_BUFFER_SAMPLES = 5000;
-const BROADCAST_SAMPLES = 500;
+const BROADCAST_SAMPLES  = 500;
+
+// Master beacon fires every 1 ms = 1000 Hz.  Must match BEACON_INTERVAL_US in ESP_master.
+const BEACON_INTERVAL_US = 1000;
 
 /** Shared research protocol options (monitor + game). */
 const RESEARCH = {
@@ -101,19 +113,23 @@ class Biquad {
 }
 
 class ChannelFilter {
-  constructor(fs = 1000) {
+  constructor(fs = 500) {
     this.fs = fs;
     this.enabled = true;
-    this._hp = new Biquad();
-    this._lp = new Biquad();
+    this._hp    = new Biquad();
+    this._lp    = new Biquad();
     this._notch = new Biquad();
     this._rebuild(fs);
   }
 
   _rebuild(fs) {
     this.fs = fs;
+    // Highpass at 20 Hz — removes motion artefact / DC offset
     this._hp.setParams(fs, 'highpass', 20, 0.707);
+    // Lowpass: fs*0.45 keeps LP well below Nyquist; hard cap at 450 Hz covers
+    // the full 20-450 Hz EMG spectrum at 1000 Hz sampling.
     this._lp.setParams(fs, 'lowpass', Math.min(450, fs * 0.45), 0.707);
+    // 50 Hz notch — power line interference (Q=35 for sharp notch)
     this._notch.setParams(fs, 'notch', 50, 35);
   }
 
@@ -137,7 +153,7 @@ class ChannelFilter {
     return x;
   }
 
-  static applyOffline(samples, fs = 1000) {
+  static applyOffline(samples, fs = 500) {
     if (samples.length < 27) return samples;
     const f = new ChannelFilter(fs);
     f.enabled = true;
@@ -149,7 +165,12 @@ class ChannelFilter {
 
 class FilterBank {
   constructor() {
-    this._filters = { 1: new ChannelFilter(), 2: new ChannelFilter(), 3: new ChannelFilter(), 4: new ChannelFilter() };
+    this._filters = {
+      1: new ChannelFilter(),
+      2: new ChannelFilter(),
+      3: new ChannelFilter(),
+      4: new ChannelFilter(),
+    };
     this._enabled = true;
   }
 
@@ -179,14 +200,23 @@ class FilterBank {
 class ChannelData {
   constructor(channelId) {
     this.channelId = channelId;
-    this.buffer = [];
-    this.rms = 0;
-    this.mean = 0;
-    this.peak = 0;
-    this.peak_to_peak = 0;
-    this.sample_rate = 0;
-    this._sampleCount = 0;
+    this.buffer    = [];
+    this.rms            = 0;
+    this.mean           = 0;
+    this.peak           = 0;
+    this.peak_to_peak   = 0;
+    this.sample_rate    = 0;   // browser-measured (backup)
+    this._hwRate        = 0;   // hardware rate from dt_us — authoritative
+    this._sampleCount   = 0;
     this._rateWindowStart = performance.now();
+  }
+
+  /**
+   * Set the authoritative sample rate derived from firmware dt_us.
+   * Called once per packet; far more stable than browser timing.
+   */
+  setHwRate(hz) {
+    this._hwRate = hz;
   }
 
   ingest(samples) {
@@ -195,11 +225,12 @@ class ChannelData {
       if (this.buffer.length > MAX_BUFFER_SAMPLES) this.buffer.shift();
     }
     this._sampleCount += samples.length;
-    const now = performance.now();
+    const now     = performance.now();
     const elapsed = (now - this._rateWindowStart) / 1000;
-    if (elapsed >= 1) {
-      this.sample_rate = this._sampleCount / elapsed;
-      this._sampleCount = 0;
+    if (elapsed >= 0.5) {
+      // Keep browser measurement as a sanity check / fallback
+      this.sample_rate    = this._sampleCount / elapsed;
+      this._sampleCount   = 0;
       this._rateWindowStart = now;
     }
     this._computeMetrics();
@@ -210,27 +241,31 @@ class ChannelData {
     if (!data.length) return;
     let sum = 0, sumSq = 0, min = Infinity, max = -Infinity;
     for (const x of data) {
-      sum += x;
+      sum   += x;
       sumSq += x * x;
       if (x < min) min = x;
       if (x > max) max = x;
     }
     const n = data.length;
-    this.mean = sum / n;
-    this.rms = Math.sqrt(sumSq / n);
-    this.peak = max;
+    this.mean         = sum / n;
+    this.rms          = Math.sqrt(sumSq / n);
+    this.peak         = max;
     this.peak_to_peak = max - min;
   }
 
   snapshot() {
     const samples = this.buffer.slice(-BROADCAST_SAMPLES);
+    // Prefer hardware rate (from dt_us). Falls back to browser measurement.
+    const displayRate = this._hwRate > 0
+      ? this._hwRate
+      : Math.round(this.sample_rate * 10) / 10;
     return {
-      ch: this.channelId,
-      rms: Math.round(this.rms * 10) / 10,
-      mean: Math.round(this.mean * 10) / 10,
-      peak: Math.round(this.peak * 10) / 10,
-      peak_to_peak: Math.round(this.peak_to_peak * 10) / 10,
-      sample_rate: Math.round(this.sample_rate * 10) / 10,
+      ch:            this.channelId,
+      rms:           Math.round(this.rms          * 10) / 10,
+      mean:          Math.round(this.mean         * 10) / 10,
+      peak:          Math.round(this.peak         * 10) / 10,
+      peak_to_peak:  Math.round(this.peak_to_peak * 10) / 10,
+      sample_rate:   displayRate,
       samples,
     };
   }
@@ -238,7 +273,7 @@ class ChannelData {
 
 // ── Recorder helpers ───────────────────────────────────────────────────────────
 
-/** ESP32 master JSON: t0 is slave millis() at first sample of batch (NOT wall clock). */
+/** ESP32 master JSON: t0 is a frame-based timestamp (frame_id × BEACON_INTERVAL_US/1000 ms). */
 function packetT0Ms(packet) {
   if (packet.t0_ms != null) return parseInt(packet.t0_ms, 10);
   return parseInt(packet.t0 ?? 0, 10);
@@ -263,20 +298,16 @@ function wallMsToIso(wallMs) {
 
 /** Local wall-clock string in system timezone (e.g. Asia/Kolkata on Indian PC). */
 function wallMsToLocal(wallMs, timeZone) {
-  const d = new Date(wallMs);
+  const d  = new Date(wallMs);
   const tz = timeZone || getSystemTimezone();
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
     hour12: false,
   }).formatToParts(d);
   const get = (t) => parts.find(p => p.type === t)?.value ?? '00';
-  const ms = String(d.getMilliseconds()).padStart(3, '0');
+  const ms  = String(d.getMilliseconds()).padStart(3, '0');
   return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}.${ms}`;
 }
 
@@ -295,7 +326,7 @@ function estimateMedianDtUs(chSamples, active) {
       estimates.push(diffs[Math.floor(diffs.length / 2)]);
     }
   }
-  if (!estimates.length) return 1000;
+  if (!estimates.length) return BEACON_INTERVAL_US;
   estimates.sort((a, b) => a - b);
   return estimates[Math.floor(estimates.length / 2)];
 }
@@ -316,10 +347,7 @@ function nearestSample(samples, targetTs, toleranceUs) {
   let bestDiff = Infinity;
   for (const s of candidates) {
     const diff = Math.abs(s.tsUs - targetTs);
-    if (diff < bestDiff) {
-      bestDiff = diff;
-      best = s;
-    }
+    if (diff < bestDiff) { bestDiff = diff; best = s; }
   }
   return bestDiff <= toleranceUs ? best : null;
 }
@@ -332,36 +360,37 @@ class Recorder {
   }
 
   reset() {
-    this._recording = false;
-    this._label = 'testing';
-    this._participant = 'testing';
-    this._sex = 'male';
-    this._age = 25;
-    this._weight_kg = 70;
-    this._height_cm = 170;
-    this._exercise = 'squat';
-    this._trial_no = 1;
-    this._session_timestamp = '';
-    this._timezone = getSystemTimezone();
-    this._wallOriginMs = 0;
-    this._perfOrigin = 0;
-    this._chSamples = { 1: [], 2: [], 3: [], 4: [] };
-    this._chDtUs = { 1: 1000, 2: 1000, 3: 1000, 4: 1000 };
-    this._totalSamples = 0;
+    this._recording          = false;
+    this._label              = 'testing';
+    this._participant        = 'testing';
+    this._sex                = 'male';
+    this._age                = 25;
+    this._weight_kg          = 70;
+    this._height_cm          = 170;
+    this._exercise           = 'squat';
+    this._trial_no           = 1;
+    this._session_timestamp  = '';
+    this._timezone           = getSystemTimezone();
+    this._wallOriginMs       = 0;
+    this._perfOrigin         = 0;
+    this._chSamples          = { 1: [], 2: [], 3: [], 4: [] };
+    this._chDtUs             = { 1: BEACON_INTERVAL_US, 2: BEACON_INTERVAL_US,
+                                  3: BEACON_INTERVAL_US, 4: BEACON_INTERVAL_US };
+    this._totalSamples       = 0;
   }
 
   getMeta() {
     return {
-      participant: this._participant,
-      sex: this._sex,
-      age: this._age,
-      weight_kg: this._weight_kg,
-      height_cm: this._height_cm,
-      exercise: this._exercise,
-      trial_no: this._trial_no,
-      label: this._label,
+      participant:       this._participant,
+      sex:               this._sex,
+      age:               this._age,
+      weight_kg:         this._weight_kg,
+      height_cm:         this._height_cm,
+      exercise:          this._exercise,
+      trial_no:          this._trial_no,
+      label:             this._label,
       session_timestamp: this._session_timestamp,
-      timezone: this._timezone,
+      timezone:          this._timezone,
     };
   }
 
@@ -371,35 +400,35 @@ class Recorder {
   }
 
   get isRecording() { return this._recording; }
-  get label() { return this._label; }
+  get label()       { return this._label; }
   get participant() { return this._participant; }
   get sampleCount() { return this._totalSamples; }
 
   start({
-    label = 'testing',
-    participant = 'testing',
-    sex = 'male',
-    age = 25,
-    weight_kg = 70,
-    height_cm = 170,
-    exercise = 'squat',
-    trial_no = 1,
+    label        = 'testing',
+    participant  = 'testing',
+    sex          = 'male',
+    age          = 25,
+    weight_kg    = 70,
+    height_cm    = 170,
+    exercise     = 'squat',
+    trial_no     = 1,
   } = {}) {
-    this._chSamples = { 1: [], 2: [], 3: [], 4: [] };
+    this._chSamples    = { 1: [], 2: [], 3: [], 4: [] };
     this._totalSamples = 0;
-    this._participant = (participant || 'testing').trim() || 'testing';
-    this._sex = sex || 'male';
-    this._age = Math.max(1, Math.min(120, parseInt(age, 10) || 25));
-    this._weight_kg = weight_kg;
-    this._height_cm = height_cm;
-    this._exercise = exercise || 'squat';
-    this._trial_no = Math.max(1, Math.min(5, parseInt(trial_no, 10) || 1));
-    this._label = (label || this._exercise).trim() || this._exercise;
+    this._participant  = (participant || 'testing').trim() || 'testing';
+    this._sex          = sex || 'male';
+    this._age          = Math.max(1, Math.min(120, parseInt(age, 10) || 25));
+    this._weight_kg    = weight_kg;
+    this._height_cm    = height_cm;
+    this._exercise     = exercise || 'squat';
+    this._trial_no     = Math.max(1, Math.min(5, parseInt(trial_no, 10) || 1));
+    this._label        = (label || this._exercise).trim() || this._exercise;
     this._session_timestamp = new Date().toISOString();
-    this._timezone = getSystemTimezone();
+    this._timezone     = getSystemTimezone();
     this._wallOriginMs = Date.now();
-    this._perfOrigin = performance.now();
-    this._recording = true;
+    this._perfOrigin   = performance.now();
+    this._recording    = true;
   }
 
   stop() {
@@ -409,40 +438,45 @@ class Recorder {
   recordPacket(packet, hostRxPerf = performance.now()) {
     if (!this._recording) return;
     try {
-      const slave = parseInt(packet.slave ?? -1, 10);
-      const t0Ms = packetT0Ms(packet);
-      const t0Us = t0Ms * 1000;
-      const dt_us = parseInt(packet.dt_us ?? 1000, 10);
-      const dtMs = dt_us / 1000;
-      const mv = packet.mv;
-      const channel = SLAVE_TO_CHANNEL[slave];
-      if (channel == null || !Array.isArray(mv) || !mv.length) return;
+      const slave     = parseInt(packet.slave ?? -1, 10);
+      const channel   = SLAVE_TO_CHANNEL[slave];
+      if (channel == null) return;
+
+      const mv        = packet.mv;
+      if (!Array.isArray(mv) || !mv.length) return;
 
       const frameBase = packet.frame_id_start ?? packet.frame_id ?? packet.fid ?? null;
+      const dt_us     = parseInt(packet.dt_us ?? BEACON_INTERVAL_US, 10);
+      const dtMs      = dt_us / 1000;
 
       if (dt_us > 0) this._chDtUs[channel] = dt_us;
 
+      // tsUs is now frame_id × BEACON_INTERVAL_US — shared epoch across all channels.
+      // This is the key fix: before, t0_ms was each slave's own millis() which
+      // diverges per device.  Now t0_ms = frame_id_start × 2 ms (from firmware fix).
+      const t0Us = packetT0Ms(packet) * 1000;
+
       const count = mv.length;
       for (let i = 0; i < count; i++) {
-        const tsUs = t0Us + i * dt_us;
-        const valMv = Math.round((parseInt(mv[i], 10) / 4095) * 3300 * 10) / 10;
+        const tsUs   = t0Us + i * dt_us;
+        const valMv  = Math.round((parseInt(mv[i], 10) / 4095) * 3300 * 10) / 10;
         const syncKey = frameBase != null ? Number(frameBase) * 10000 + i : null;
-        // Host wall clock: last sample in batch ≈ receive time; earlier samples stepped back by dt
-        const ageMs = (count - 1 - i) * dtMs;
+        // Wall clock: last sample in batch ≈ receive time; earlier samples stepped back
+        const ageMs      = (count - 1 - i) * dtMs;
         const samplePerf = hostRxPerf - ageMs;
-        const wallMs = this._wallOriginMs + (samplePerf - this._perfOrigin);
+        const wallMs     = this._wallOriginMs + (samplePerf - this._perfOrigin);
         this._chSamples[channel].push({
           tsUs,
           valMv,
           syncKey,
-          espT0Ms: t0Ms + Math.round(i * dtMs),
+          espT0Ms:   packetT0Ms(packet) + Math.round(i * dtMs),
           wallMs,
-          wallIso: wallMsToIso(wallMs),
+          wallIso:   wallMsToIso(wallMs),
           wallLocal: wallMsToLocal(wallMs, this._timezone),
         });
         this._totalSamples++;
       }
-    } catch { /* ignore malformed */ }
+    } catch { /* ignore malformed packets */ }
   }
 
   /** Per-channel counts and sync quality for diagnostics. */
@@ -451,10 +485,10 @@ class Recorder {
     if (!active.length) return { active: [], counts: {}, mismatch_pct: 0 };
 
     const counts = {};
-    const rates = {};
+    const rates  = {};
     for (const c of active) {
       counts[c] = this._chSamples[c].length;
-      const s = this._chSamples[c];
+      const s   = this._chSamples[c];
       if (s.length >= 2) {
         const spanUs = s[s.length - 1].tsUs - s[0].tsUs;
         rates[c] = spanUs > 0 ? Math.round((s.length - 1) / (spanUs / 1e6)) : 0;
@@ -462,12 +496,18 @@ class Recorder {
         rates[c] = 0;
       }
     }
-    const vals = Object.values(counts);
-    const maxC = Math.max(...vals);
-    const minC = Math.min(...vals);
+    const vals       = Object.values(counts);
+    const maxC       = Math.max(...vals);
+    const minC       = Math.min(...vals);
     const mismatch_pct = maxC > 0 ? Math.round((maxC - minC) / maxC * 1000) / 10 : 0;
 
-    return { active, counts, rates, mismatch_pct, median_dt_us: estimateMedianDtUs(this._chSamples, active) };
+    return {
+      active,
+      counts,
+      rates,
+      mismatch_pct,
+      median_dt_us: estimateMedianDtUs(this._chSamples, active),
+    };
   }
 
   _prepareChannelValues(active, applyFilter) {
@@ -475,7 +515,7 @@ class Recorder {
     for (const c of active) {
       const raw = this._chSamples[c].map(s => s.valMv);
       if (applyFilter) {
-        const fs = 1_000_000 / (this._chDtUs[c] || 1000);
+        const fs = 1_000_000 / (this._chDtUs[c] || BEACON_INTERVAL_US);
         chValues[c] = ChannelFilter.applyOffline(raw, fs);
       } else {
         chValues[c] = raw;
@@ -486,17 +526,22 @@ class Recorder {
 
   _samplesWithValues(channel, chValues) {
     return this._chSamples[channel].map((s, i) => ({
-      tsUs: s.tsUs,
-      valMv: chValues[i],
-      syncKey: s.syncKey,
-      espT0Ms: s.espT0Ms,
-      wallMs: s.wallMs,
-      wallIso: s.wallIso,
+      tsUs:      s.tsUs,
+      valMv:     chValues[i],
+      syncKey:   s.syncKey,
+      espT0Ms:   s.espT0Ms,
+      wallMs:    s.wallMs,
+      wallIso:   s.wallIso,
       wallLocal: s.wallLocal,
     }));
   }
 
-  /** Align channels by hardware syncKey (frame_id) when firmware provides it. */
+  /**
+   * Align channels by hardware syncKey (frame_id × 10000 + intra-batch index).
+   * Since frame_id is the master's global beacon counter, it is identical for
+   * simultaneous samples on all channels → perfect alignment when firmware
+   * provides frame_id_start (which it always does now).
+   */
   _buildAlignedRows(active, chValues, medianDtUs) {
     const hasSync = active.every(c =>
       this._chSamples[c].length > 0 &&
@@ -505,22 +550,25 @@ class Recorder {
 
     if (hasSync) {
       const keySet = new Set();
-      for (const c of active) {
+      for (const c of active)
         for (const s of this._chSamples[c]) keySet.add(s.syncKey);
-      }
-      const keys = Array.from(keySet).sort((a, b) => a - b);
+      const keys  = Array.from(keySet).sort((a, b) => a - b);
       const byKey = {};
       for (const c of active) {
-        byKey[c] = new Map(this._samplesWithValues(c, chValues[c]).map(s => [s.syncKey, s]));
+        byKey[c] = new Map(
+          this._samplesWithValues(c, chValues[c]).map(s => [s.syncKey, s])
+        );
       }
       return keys.map((key, idx) => {
         const row = { index: idx, relTimeMs: null, cells: {} };
         let refTs = null;
         for (const c of active) {
-          const hit = byKey[c].get(key);
+          const hit    = byKey[c].get(key);
           row.cells[c] = hit ? {
-            tsUs: hit.tsUs, valMv: hit.valMv,
-            wallIso: hit.wallIso, wallLocal: hit.wallLocal,
+            tsUs:      hit.tsUs,
+            valMv:     hit.valMv,
+            wallIso:   hit.wallIso,
+            wallLocal: hit.wallLocal,
           } : null;
           if (hit && refTs == null) refTs = hit.tsUs;
         }
@@ -529,14 +577,12 @@ class Recorder {
       });
     }
 
-    // Timestamp grid alignment (honest: empty cell if no sample within ±dt/2)
+    // Fallback: timestamp-grid alignment (only used if frame_id_start is missing)
     const tolerance = medianDtUs / 2;
     const tMin = Math.min(...active.map(c => this._chSamples[c][0].tsUs));
     const tMax = Math.max(...active.map(c => this._chSamples[c][this._chSamples[c].length - 1].tsUs));
     const prepared = {};
-    for (const c of active) {
-      prepared[c] = this._samplesWithValues(c, chValues[c]);
-    }
+    for (const c of active) prepared[c] = this._samplesWithValues(c, chValues[c]);
 
     const rows = [];
     let idx = 0;
@@ -545,17 +591,15 @@ class Recorder {
       let any = false;
       for (const c of active) {
         const hit = nearestSample(prepared[c], T, tolerance);
-        cells[c] = hit ? {
-          tsUs: hit.tsUs,
-          valMv: hit.valMv,
-          wallIso: hit.wallIso,
+        cells[c]  = hit ? {
+          tsUs:      hit.tsUs,
+          valMv:     hit.valMv,
+          wallIso:   hit.wallIso,
           wallLocal: hit.wallLocal,
         } : null;
         if (hit) any = true;
       }
-      if (any) {
-        rows.push({ index: idx++, refTsUs: T, relTimeMs: (T - tMin) / 1000, cells });
-      }
+      if (any) rows.push({ index: idx++, refTsUs: T, relTimeMs: (T - tMin) / 1000, cells });
     }
     return rows;
   }
@@ -580,9 +624,9 @@ class Recorder {
     if (!active.length) return 'sample_index,rel_time_ms\n';
 
     const medianDtUs = estimateMedianDtUs(this._chSamples, active);
-    const chValues = this._prepareChannelValues(active, applyFilter);
-    const aligned = this._buildAlignedRows(active, chValues, medianDtUs);
-    const tMin = aligned.length ? (aligned[0].refTsUs ?? 0) : 0;
+    const chValues   = this._prepareChannelValues(active, applyFilter);
+    const aligned    = this._buildAlignedRows(active, chValues, medianDtUs);
+    const tMin       = aligned.length ? (aligned[0].refTsUs ?? 0) : 0;
     const filterNote = applyFilter ? 'filtered' : 'raw';
 
     const header = [
@@ -609,7 +653,7 @@ class Recorder {
         row.refTsUs,
         relMs,
         refCell?.wallLocal ?? '',
-        refCell?.wallIso ?? '',
+        refCell?.wallIso   ?? '',
       ];
       for (const c of active) {
         const cell = row.cells[c];
@@ -632,7 +676,7 @@ class Recorder {
     const active = [1, 2, 3, 4].filter(c => this._chSamples[c].length);
     if (!active.length) return 'channel,timestamp_us,value_mV\n';
 
-    const chValues = this._prepareChannelValues(active, applyFilter);
+    const chValues   = this._prepareChannelValues(active, applyFilter);
     const filterNote = applyFilter ? 'filtered' : 'raw';
     const header = [
       'participant', 'sex', 'age', 'weight_kg', 'height_cm',
@@ -641,12 +685,12 @@ class Recorder {
       'recorded_at_local', 'recorded_at_iso',
       `value_mV_${filterNote}`, 'sync_key',
     ];
-    const rows = [header.join(',')];
+    const rows   = [header.join(',')];
     const prefix = this._metaRowPrefix();
 
     for (const c of active) {
       const samples = this._chSamples[c];
-      const vals = chValues[c];
+      const vals    = chValues[c];
       for (let i = 0; i < samples.length; i++) {
         rows.push([
           ...prefix,
@@ -667,15 +711,20 @@ class Recorder {
 // ── EMG Engine (singleton) ───────────────────────────────────────────────────
 
 const EmgEngine = {
-  _channels: { 1: new ChannelData(1), 2: new ChannelData(2), 3: new ChannelData(3), 4: new ChannelData(4) },
-  _filterBank: new FilterBank(),
-  recorder: new Recorder(),
-  connected: false,
-  _stats: { rx_packets: 0, rx_errors: 0, bytes_received: 0 },
-  _rafId: null,
+  _channels: {
+    1: new ChannelData(1),
+    2: new ChannelData(2),
+    3: new ChannelData(3),
+    4: new ChannelData(4),
+  },
+  _filterBank:  new FilterBank(),
+  recorder:     new Recorder(),
+  connected:    false,
+  _stats:       { rx_packets: 0, rx_errors: 0, bytes_received: 0 },
+  _rafId:       null,
   _lastBroadcast: 0,
 
-  get filterEnabled() { return this._filterBank.enabled; },
+  get filterEnabled()  { return this._filterBank.enabled; },
   set filterEnabled(v) { this._filterBank.enabled = v; },
 
   setStats(stats) {
@@ -689,9 +738,9 @@ const EmgEngine = {
 
   onPacket(packet, hostRxPerf) {
     try {
-      const slave = parseInt(packet.slave ?? -1, 10);
-      const mv = packet.mv;
-      const dt_us = parseInt(packet.dt_us ?? 1000, 10);
+      const slave     = parseInt(packet.slave ?? -1, 10);
+      const mv        = packet.mv;
+      const dt_us     = parseInt(packet.dt_us ?? BEACON_INTERVAL_US, 10);
       const channelId = SLAVE_TO_CHANNEL[slave];
       if (channelId == null || !Array.isArray(mv)) return;
 
@@ -700,13 +749,17 @@ const EmgEngine = {
       );
 
       if (dt_us > 0) {
-        this._filterBank.updateFs(channelId, 1_000_000 / dt_us);
+        const fsHz = 1_000_000 / dt_us;
+        // Update filter coefficients for this channel's actual sample rate
+        this._filterBank.updateFs(channelId, fsHz);
+        // Set hardware-derived rate for stable UI display (all channels = 500 Hz)
+        this._channels[channelId].setHwRate(fsHz);
       }
 
       const filtered = this._filterBank.process(channelId, samples);
       this._channels[channelId].ingest(filtered);
       this.recorder.recordPacket(packet, hostRxPerf ?? performance.now());
-    } catch { /* ignore */ }
+    } catch { /* ignore malformed packets */ }
   },
 
   resetFilters() {
@@ -719,14 +772,14 @@ const EmgEngine = {
 
   _emit() {
     const detail = {
-      type: 'channels',
-      connected: this.connected,
-      recording: this.recorder.isRecording,
+      type:            'channels',
+      connected:       this.connected,
+      recording:       this.recorder.isRecording,
       recording_label: this.recorder.label,
-      filter_enabled: this.filterEnabled,
-      stats: { ...this._stats },
-      recording_diag: this.recorder.isRecording ? this.recorder.getDiagnostics() : null,
-      channels: this.getSnapshot(),
+      filter_enabled:  this.filterEnabled,
+      stats:           { ...this._stats },
+      recording_diag:  this.recorder.isRecording ? this.recorder.getDiagnostics() : null,
+      channels:        this.getSnapshot(),
     };
     window.dispatchEvent(new CustomEvent('emg-update', { detail }));
   },
@@ -753,27 +806,27 @@ const EmgEngine = {
   /** Trigger browser download of recorder CSV. */
   downloadRecorderCSV(applyFilter = true) {
     if (this.recorder.sampleCount === 0) return false;
-    const csv = this.recorder.toCSV(applyFilter);
+    const csv    = this.recorder.toCSV(applyFilter);
     const suffix = applyFilter ? 'aligned_filtered' : 'aligned_raw';
-    const name = `${this.recorder.filenameBase()}_${suffix}.csv`;
+    const name   = `${this.recorder.filenameBase()}_${suffix}.csv`;
     EmgEngine._downloadText(csv, name);
     return true;
   },
 
   downloadRecorderLongCSV(applyFilter = true) {
     if (this.recorder.sampleCount === 0) return false;
-    const csv = this.recorder.toLongCSV(applyFilter);
+    const csv    = this.recorder.toLongCSV(applyFilter);
     const suffix = applyFilter ? 'long_filtered' : 'long_raw';
-    const name = `${this.recorder.filenameBase()}_${suffix}.csv`;
+    const name   = `${this.recorder.filenameBase()}_${suffix}.csv`;
     EmgEngine._downloadText(csv, name);
     return true;
   },
 
   _downloadText(content, filename) {
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
@@ -782,6 +835,6 @@ const EmgEngine = {
   },
 };
 
-window.EmgEngine = EmgEngine;
-window.RESEARCH = RESEARCH;
+window.EmgEngine       = EmgEngine;
+window.RESEARCH        = RESEARCH;
 window.getSystemTimezone = getSystemTimezone;

@@ -549,71 +549,46 @@ class Recorder {
   }
 
   /**
-   * Align channels by hardware syncKey (frame_id × 10000 + intra-batch index).
-   * Since frame_id is the master's global beacon counter, it is identical for
-   * simultaneous samples on all channels → perfect alignment when firmware
-   * provides frame_id_start (which it always does now).
+   * Align channels by hardware timestamp (tsUs = frame_id * dt_us us).
+   * Every slave samples on the SAME master beacon tick, so two samples with
+   * identical tsUs are genuinely simultaneous.  Join on tsUs -> true parallel.
    */
   _buildAlignedRows(active, chValues, medianDtUs) {
-    const hasSync = active.every(c =>
-      this._chSamples[c].length > 0 &&
-      this._chSamples[c].every(s => s.syncKey != null)
-    );
-
-    if (hasSync) {
-      const keySet = new Set();
-      for (const c of active)
-        for (const s of this._chSamples[c]) keySet.add(s.syncKey);
-      const keys  = Array.from(keySet).sort((a, b) => a - b);
-      const byKey = {};
-      for (const c of active) {
-        byKey[c] = new Map(
-          this._samplesWithValues(c, chValues[c]).map(s => [s.syncKey, s])
-        );
-      }
-      return keys.map((key, idx) => {
-        const row = { index: idx, relTimeMs: null, cells: {} };
-        let refTs = null;
-        for (const c of active) {
-          const hit    = byKey[c].get(key);
-          row.cells[c] = hit ? {
-            tsUs:      hit.tsUs,
-            valMv:     hit.valMv,
-            wallIso:   hit.wallIso,
-            wallLocal: hit.wallLocal,
-          } : null;
-          if (hit && refTs == null) refTs = hit.tsUs;
+    // Build Map<tsUs, sample> per channel (keep first on duplicate ts)
+    const byTs = {};
+    for (const c of active) {
+      byTs[c] = new Map();
+      for (const s of this._samplesWithValues(c, chValues[c])) {
+        if (!byTs[c].has(s.tsUs)) {
+          byTs[c].set(s.tsUs, {
+            tsUs:      s.tsUs,
+            valMv:     s.valMv,
+            wallLocal: s.wallLocal,
+            wallIso:   s.wallIso,
+          });
         }
-        row.refTsUs = refTs;
-        return row;
-      });
+      }
     }
 
-    // Fallback: timestamp-grid alignment (only used if frame_id_start is missing)
-    const tolerance = medianDtUs / 2;
-    const tMin = Math.min(...active.map(c => this._chSamples[c][0].tsUs));
-    const tMax = Math.max(...active.map(c => this._chSamples[c][this._chSamples[c].length - 1].tsUs));
-    const prepared = {};
-    for (const c of active) prepared[c] = this._samplesWithValues(c, chValues[c]);
+    // Union of all tsUs values across all channels, sorted ascending
+    const tsSet = new Set();
+    for (const c of active) for (const ts of byTs[c].keys()) tsSet.add(ts);
+    const sortedTs = Array.from(tsSet).sort((a, b) => a - b);
 
-    const rows = [];
-    let idx = 0;
-    for (let T = tMin; T <= tMax + medianDtUs / 2; T += medianDtUs) {
+    // One output row per timestamp; null where channel missed that beacon
+    return sortedTs.map((ts, idx) => {
       const cells = {};
-      let any = false;
       for (const c of active) {
-        const hit = nearestSample(prepared[c], T, tolerance);
-        cells[c]  = hit ? {
+        const hit = byTs[c].get(ts);
+        cells[c] = hit ? {
           tsUs:      hit.tsUs,
           valMv:     hit.valMv,
-          wallIso:   hit.wallIso,
           wallLocal: hit.wallLocal,
+          wallIso:   hit.wallIso,
         } : null;
-        if (hit) any = true;
       }
-      if (any) rows.push({ index: idx++, refTsUs: T, relTimeMs: (T - tMin) / 1000, cells });
-    }
-    return rows;
+      return { index: idx, refTsUs: ts, relTimeMs: null, cells };
+    });
   }
 
   /** Build the 2-line metadata comment header. */

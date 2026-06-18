@@ -28,15 +28,26 @@ const RESEARCH = {
     { value: 'jump',       label: 'Jump' },
     { value: 'squat',      label: 'Squat' },
     { value: 'lunge',      label: 'Lunge' },
-    { value: 'deadlift',   label: 'Deadlift' },
+    { value: 'deadlift',   label: 'Deadlift / Stair Climbing' },
     { value: 'calf_raise', label: 'Calf Raise' },
-    { value: 'box_jump',   label: 'Box Jump' },
+    { value: 'box_jump',   label: 'Box Jump / Walking' },
+    { value: 'walking',    label: 'Walking' },
+    { value: 'stair_climb',label: 'Stair Climbing' },
   ],
   TRIALS: [1, 2, 3, 4, 5],
   SEX_OPTIONS: [
     { value: 'male',   label: 'Male' },
     { value: 'female', label: 'Female' },
   ],
+};
+
+// Channel label map for CSV headers
+const CH_MUSCLE_LABEL = { 1: 'RF', 2: 'BF', 3: 'GAS', 4: 'TA' };
+const CH_MUSCLE_FULL  = {
+  1: 'Rectus_Femoris',
+  2: 'Biceps_Femoris',
+  3: 'Gastrocnemius',
+  4: 'Tibialis_Anterior',
 };
 
 // ── Biquad IIR (RBJ cookbook) ────────────────────────────────────────────────
@@ -605,107 +616,85 @@ class Recorder {
     return rows;
   }
 
-  _metaRowPrefix() {
-    return [
-      this._participant,
-      this._sex,
-      this._age,
-      this._weight_kg,
-      this._height_cm,
-      this._exercise,
-      this._trial_no,
-      this._session_timestamp,
-      this._label,
-      this._timezone,
-    ];
+  /** Build the 2-line metadata comment header. */
+  _metaHeader() {
+    const line1 = `# participant=${this._participant} | sex=${this._sex} | age=${this._age} | weight_kg=${this._weight_kg} | height_cm=${this._height_cm}`;
+    const line2 = `# exercise=${this._exercise} | trial_no=${this._trial_no} | label=${this._label} | session=${this._session_timestamp} | tz=${this._timezone}`;
+    return line1 + '\n' + line2;
   }
 
+  /**
+   * Clean CSV export:
+   *   Line 1: # participant metadata comment
+   *   Line 2: # session metadata comment
+   *   Line 3: column header
+   *   Line 4+: datetime_local, ch1_mV, ch2_mV, ch3_mV  (NaN where channel missing)
+   *
+   * Alignment: exact sync key (frame_id × 10000 + i) — same shared epoch for all channels.
+   */
   toCSV(applyFilter = true) {
     const active = [1, 2, 3, 4].filter(c => this._chSamples[c].length);
-    if (!active.length) return 'sample_index,rel_time_ms\n';
+    if (!active.length) return '# no data\ndatetime_local\n';
 
     const medianDtUs = estimateMedianDtUs(this._chSamples, active);
     const chValues   = this._prepareChannelValues(active, applyFilter);
     const aligned    = this._buildAlignedRows(active, chValues, medianDtUs);
-    const tMin       = aligned.length ? (aligned[0].refTsUs ?? 0) : 0;
-    const filterNote = applyFilter ? 'filtered' : 'raw';
+    const suffix     = applyFilter ? 'filtered_mV' : 'raw_mV';
 
-    const header = [
-      'participant', 'sex', 'age', 'weight_kg', 'height_cm',
-      'exercise', 'trial_no', 'session_timestamp', 'label', 'timezone',
-      'sample_index', 'ref_timestamp_us', 'rel_time_ms',
-      'recorded_at_local', 'recorded_at_iso',
-    ];
-    for (const c of active) {
-      header.push(`esp_t0_ch${c}_ms`, `ts_ch${c}_us`, `ch${c}_${filterNote}`);
-    }
-    header.push('channels_present');
+    // Build column headers using muscle names
+    const chHeaders = active.map(c => {
+      const muscle = CH_MUSCLE_FULL[c] ?? `ch${c}`;
+      return `${muscle}_${suffix}`;
+    });
+    const header = ['datetime_local', ...chHeaders].join(',');
 
-    const rows = [header.join(',')];
+    const lines = [this._metaHeader(), header];
+
     for (const row of aligned) {
-      const relMs = row.relTimeMs != null
-        ? Math.round(row.relTimeMs * 1000) / 1000
-        : Math.round((row.refTsUs - tMin) / 1000 * 1000) / 1000;
+      // Use the first non-null cell's wall timestamp as the row timestamp
       const refCell = active.map(c => row.cells[c]).find(Boolean);
-      const present = [];
-      const data = [
-        ...this._metaRowPrefix(),
-        row.index,
-        row.refTsUs,
-        relMs,
-        refCell?.wallLocal ?? '',
-        refCell?.wallIso   ?? '',
-      ];
-      for (const c of active) {
+      const dt = refCell?.wallLocal ?? refCell?.wallIso ?? '';
+
+      const vals = active.map(c => {
         const cell = row.cells[c];
-        if (cell) {
-          const espT0 = this._chSamples[c].find(s => s.tsUs === cell.tsUs)?.espT0Ms ?? '';
-          data.push(espT0, cell.tsUs, Math.round(cell.valMv * 100) / 100);
-          present.push(c);
-        } else {
-          data.push('', '', '');
-        }
-      }
-      data.push(present.join('|') || '');
-      rows.push(data.join(','));
+        return cell ? Math.round(cell.valMv * 100) / 100 : '';
+      });
+
+      lines.push([dt, ...vals].join(','));
     }
-    return rows.join('\n');
+
+    return lines.join('\n');
   }
 
-  /** Long-format CSV: one row per sample — no cross-channel alignment assumptions. */
+  /**
+   * Long-format CSV: one row per sample, all channels stacked.
+   * Still uses 2-line metadata header. Good for debugging individual channel timing.
+   * Format: datetime_local, channel, muscle, hw_timestamp_us, value_mV
+   */
   toLongCSV(applyFilter = true) {
     const active = [1, 2, 3, 4].filter(c => this._chSamples[c].length);
-    if (!active.length) return 'channel,timestamp_us,value_mV\n';
+    if (!active.length) return '# no data\ndatetime_local,channel,muscle,hw_timestamp_us,value_mV\n';
 
     const chValues   = this._prepareChannelValues(active, applyFilter);
-    const filterNote = applyFilter ? 'filtered' : 'raw';
-    const header = [
-      'participant', 'sex', 'age', 'weight_kg', 'height_cm',
-      'exercise', 'trial_no', 'session_timestamp', 'label', 'timezone',
-      'channel', 'esp_t0_ms', 'hw_timestamp_us',
-      'recorded_at_local', 'recorded_at_iso',
-      `value_mV_${filterNote}`, 'sync_key',
-    ];
-    const rows   = [header.join(',')];
-    const prefix = this._metaRowPrefix();
+    const suffix     = applyFilter ? 'filtered_mV' : 'raw_mV';
+    const header     = ['datetime_local', 'channel', 'muscle', 'hw_timestamp_us', suffix].join(',');
+    const lines      = [this._metaHeader(), header];
 
     for (const c of active) {
       const samples = this._chSamples[c];
       const vals    = chValues[c];
+      const muscle  = CH_MUSCLE_FULL[c] ?? `ch${c}`;
       for (let i = 0; i < samples.length; i++) {
-        rows.push([
-          ...prefix,
+        lines.push([
+          samples[i].wallLocal || samples[i].wallIso || '',
           c,
-          samples[i].espT0Ms,
+          muscle,
           samples[i].tsUs,
-          samples[i].wallLocal,
-          samples[i].wallIso,
           Math.round(vals[i] * 100) / 100,
-          samples[i].syncKey ?? '',
         ].join(','));
       }
     }
-    return rows.join('\n');
+    return lines.join('\n');
   }
 }
 
@@ -804,16 +793,17 @@ const EmgEngine = {
     }
   },
 
-  /** Trigger browser download of recorder CSV. */
+  /** Download clean aligned CSV (2-line meta + datetime + muscle columns). */
   downloadRecorderCSV(applyFilter = true) {
     if (this.recorder.sampleCount === 0) return false;
     const csv    = this.recorder.toCSV(applyFilter);
-    const suffix = applyFilter ? 'aligned_filtered' : 'aligned_raw';
+    const suffix = applyFilter ? 'filtered' : 'raw';
     const name   = `${this.recorder.filenameBase()}_${suffix}.csv`;
     EmgEngine._downloadText(csv, name);
     return true;
   },
 
+  /** Download long-format CSV (one row per sample, stacked channels). */
   downloadRecorderLongCSV(applyFilter = true) {
     if (this.recorder.sampleCount === 0) return false;
     const csv    = this.recorder.toLongCSV(applyFilter);

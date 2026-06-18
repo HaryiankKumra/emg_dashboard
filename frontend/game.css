@@ -77,8 +77,8 @@ html, body {
 .overlay {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(5,8,15,0.90);
-  backdrop-filter: blur(18px) saturate(1.2);
+  background: rgba(5,8,15,0.95);
+  backdrop-filter: blur(4px) saturate(1.1);
   z-index: 100;
   animation: overlay-in 0.28s ease;
 }

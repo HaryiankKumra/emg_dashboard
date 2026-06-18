@@ -60,6 +60,8 @@ var SESSION = {
   calibrated: false,
   activeChannels: [1],   // array of active channels, e.g. [1, 2], [1, 2, 3, 4], or [0] for Auto
   combMode: 'avg',       // avg | max | min
+  targetLimb: 'leg',     // leg | arm
+  anatomyZoom: 1.0,      // zoom level (1.0 = regular, 1.6 = zoomed)
 };
 
 // ── Per-hurdle log ────────────────────────────────────
@@ -103,8 +105,13 @@ var ctx = canvas.getContext('2d');
 var W = 0, H = 0;
 
 function resize() {
-  W = canvas.width  = canvas.offsetWidth;
-  H = canvas.height = canvas.offsetHeight;
+  var dpr = window.devicePixelRatio || 1;
+  W = canvas.offsetWidth;
+  H = canvas.offsetHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.resetTransform();
+  ctx.scale(dpr, dpr);
 }
 window.addEventListener('resize', resize);
 resize();
@@ -377,12 +384,13 @@ function drawCharacter(dt) {
   ctx.shadowColor = color;
   ctx.shadowBlur = (phase === 'jumping') ? 28 : 10;
 
-  // If hit, tumble/rotate!
+  // If hit, tumble/rotate and fade out!
   if (phase === 'hit') {
     var rot = (1.2 - GAME.hitTimer) * (Math.PI * 2);
     ctx.translate(0, -CHAR_H/2);
     ctx.rotate(rot);
     ctx.translate(0, CHAR_H/2);
+    ctx.globalAlpha = Math.max(0, GAME.hitTimer / 1.2);
   }
 
   // Define key coordinates:
@@ -539,8 +547,12 @@ function updateWaveform() {
   var wctx = wc.getContext('2d');
   var wW = wc.offsetWidth;
   var wH = 60;
-  wc.width  = wW;
-  wc.height = wH;
+  
+  var dpr = window.devicePixelRatio || 1;
+  wc.width  = wW * dpr;
+  wc.height = wH * dpr;
+  wctx.resetTransform();
+  wctx.scale(dpr, dpr);
 
   wctx.clearRect(0, 0, wW, wH);
 
@@ -646,6 +658,8 @@ function startLoop() {
 function update(dt) {
   if (GAME.phase === 'approaching') {
     updateApproach(dt);
+  } else if (GAME.phase === 'resting') {
+    updateResting(dt);
   } else if (GAME.phase === 'at_hurdle') {
     updateAtHurdle(dt);
   } else if (GAME.phase === 'jumping') {
@@ -666,6 +680,21 @@ function updateApproach(dt) {
 
   if (GAME.approachT >= GAME.approachDur) {
     beginAtHurdle();
+  }
+}
+
+// ── Resting check (wait until user relaxes forearm/leg muscle) ──────────
+function updateResting(dt) {
+  var relaxThreshold = Math.max(SESSION.baseline + 8, SESSION.threshold * 0.4, 15);
+  var currentRms = Math.round(EMG.rms);
+  
+  $('cd-big').textContent = currentRms + ' mV';
+  
+  if (EMG.rms < relaxThreshold) {
+    beginReadyPhase();
+  } else {
+    $('cd-sub').textContent = '🧘 RELAX YOUR MUSCLE (Target: <' + Math.round(relaxThreshold) + ' mV)';
+    $('cd-sub').style.color = '#ffb300';
   }
 }
 
@@ -763,7 +792,9 @@ function updateJump(dt) {
 function updateHit(dt) {
   GAME.hitTimer -= dt;
   if (GAME.hitTimer <= 0) {
-    // Retry same hurdle: walk back to approach position
+    // Respawn character behind the hurdle to walk forward
+    var prevFrac = hurdleFrac(GAME.currentHurdle) - 0.15;
+    GAME.charFrac = Math.max(0, prevFrac);
     beginApproach(GAME.currentHurdle);
   }
 }
@@ -1301,6 +1332,7 @@ function readGameSessionMeta() {
     exercise: $('inp-exercise').value || 'squat',
     trial_no: parseInt($('inp-trial').value, 10) || 1,
     label: $('inp-exercise').value || 'squat',
+    targetLimb: $('inp-limb').value || 'leg',
   };
 }
 
@@ -1309,6 +1341,64 @@ function startGameEMGRecording() {
   var meta = readGameSessionMeta();
   EmgEngine.resetFilters();
   EmgEngine.recorder.start(meta);
+}
+
+// Global limb structures
+var LIMB_EXERCISES = {
+  leg: [
+    { value: 'squat', label: 'Squat', selected: true },
+    { value: 'jump', label: 'Jump' },
+    { value: 'lunge', label: 'Lunge' },
+    { value: 'deadlift', label: 'Deadlift' },
+    { value: 'calf_raise', label: 'Calf Raise' },
+    { value: 'box_jump', label: 'Box Jump' }
+  ],
+  arm: [
+    { value: 'bicep_curl', label: 'Bicep Curl', selected: true },
+    { value: 'tricep_ext', label: 'Tricep Extension' },
+    { value: 'wrist_curl', label: 'Wrist Curl' },
+    { value: 'pushup', label: 'Push-up' },
+    { value: 'shoulder_press', label: 'Shoulder Press' }
+  ]
+};
+
+var CH_LABELS = {
+  leg: {
+    1: 'CH1 — Rectus Femoris',
+    2: 'CH2 — Biceps Femoris',
+    3: 'CH3 — Gastrocnemius',
+    4: 'CH4 — Spare'
+  },
+  arm: {
+    1: 'CH1 — Biceps Brachii',
+    2: 'CH2 — Triceps Brachii',
+    3: 'CH3 — Brachioradialis',
+    4: 'CH4 — Flexor Carpi'
+  }
+};
+
+function updateExerciseOptions(limb) {
+  var select = $('inp-exercise');
+  if (!select) return;
+  select.innerHTML = '';
+  var list = LIMB_EXERCISES[limb] || [];
+  list.forEach(function(opt) {
+    var el = document.createElement('option');
+    el.value = opt.value;
+    el.textContent = opt.label;
+    if (opt.selected) el.selected = true;
+    select.appendChild(el);
+  });
+}
+
+function updateChannelLabels(limb) {
+  var labels = CH_LABELS[limb] || {};
+  [1, 2, 3, 4].forEach(function(chId) {
+    var btn = $('ch-btn-' + chId);
+    if (btn) {
+      btn.textContent = labels[chId] || ('CH' + chId);
+    }
+  });
 }
 
 function stopGameEMGRecording() {
@@ -1326,6 +1416,7 @@ function startProtocol() {
   SESSION.height_cm      = meta.height_cm;
   SESSION.exercise       = meta.exercise;
   SESSION.trial_no       = meta.trial_no;
+  SESSION.targetLimb     = meta.targetLimb;
   SESSION.numHurdles       = parseInt($('inp-hurdles').value);
   SESSION.attemptTimeLimit = parseInt($('inp-timelimit').value);
 
@@ -1581,23 +1672,47 @@ function updateAnatomyCanvas() {
   var canvas = $('anatomy-canvas');
   if (!canvas) return;
   var actx = canvas.getContext('2d');
-  var w = canvas.width;
-  var h = canvas.height;
+  var w = canvas.offsetWidth;
+  var h = canvas.offsetHeight;
+
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  actx.resetTransform();
+  actx.scale(dpr, dpr);
+
+  var isArm = (SESSION.targetLimb === 'arm');
+
+  // Zoom logic centering around active muscle
+  var zoom = SESSION.anatomyZoom || 1.0;
+  if (zoom > 1.0) {
+    var cx = 110, cy = 150;
+    var active = SESSION.activeChannels || [1];
+    if (isArm) {
+      cx = 100; cy = 130;
+    } else {
+      if (active.indexOf(3) !== -1) { cx = 120; cy = 220; }
+      else if (active.indexOf(1) !== -1 || active.indexOf(2) !== -1) { cx = 115; cy = 105; }
+    }
+    actx.translate(w / 2, h / 2);
+    actx.scale(zoom, zoom);
+    actx.translate(-cx, -cy);
+  }
 
   actx.clearRect(0, 0, w, h);
 
-  // Draw technological background grid
+  // Draw background grid
   actx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
   actx.lineWidth = 1;
-  for (var x = 0; x < w; x += 20) {
-    actx.beginPath(); actx.moveTo(x, 0); actx.lineTo(x, h); actx.stroke();
+  for (var x = -100; x < w + 200; x += 20) {
+    actx.beginPath(); actx.moveTo(x, -100); actx.lineTo(x, h + 200); actx.stroke();
   }
-  for (var y = 0; y < h; y += 20) {
-    actx.beginPath(); actx.moveTo(0, y); actx.lineTo(w, y); actx.stroke();
+  for (var y = -100; y < h + 200; y += 20) {
+    actx.beginPath(); actx.moveTo(-100, y); actx.lineTo(w + 200, y); actx.stroke();
   }
 
-  // Silhouette coordinate points for the leg model (facing left)
-  var points = [
+  // Leg Outline Profile Coordinates
+  var legPoints = [
     {x: 120, y: 25},  // Hip top
     {x: 95,  y: 125}, // Front thigh
     {x: 102, y: 175}, // Knee cap
@@ -1613,6 +1728,25 @@ function updateAnatomyCanvas() {
     {x: 142, y: 105}, // Back thigh
     {x: 145, y: 45}   // Buttocks
   ];
+
+  // Arm Outline Profile Coordinates
+  var armPoints = [
+    {x: 75,  y: 25},  // Shoulder top
+    {x: 110, y: 75},  // Biceps front
+    {x: 115, y: 125}, // Inner elbow
+    {x: 95,  y: 180}, // Forearm front
+    {x: 82,  y: 235}, // Wrist front
+    {x: 65,  y: 255}, // Hand thumb
+    {x: 55,  y: 265}, // Finger tip
+    {x: 65,  y: 275}, // Palm back
+    {x: 92,  y: 240}, // Wrist back
+    {x: 118, y: 180}, // Extensors back
+    {x: 130, y: 135}, // Elbow joint
+    {x: 122, y: 75},  // Triceps back
+    {x: 100, y: 25}   // Armpit/Arm base
+  ];
+
+  var points = isArm ? armPoints : legPoints;
 
   // Draw outline
   actx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
@@ -1630,15 +1764,24 @@ function updateAnatomyCanvas() {
   actx.fillStyle = 'rgba(255, 255, 255, 0.02)';
   actx.fill();
 
-  // Knee joint dot
+  // Draw joints with reduced dot sizes
   actx.fillStyle = 'rgba(255, 255, 255, 0.22)';
-  actx.beginPath(); actx.arc(112, 175, 3.5, 0, Math.PI * 2); actx.fill();
-
-  // Ankle joint dot
-  actx.beginPath(); actx.arc(108, 290, 2.5, 0, Math.PI * 2); actx.fill();
+  if (isArm) {
+    // Shoulder joint dot
+    actx.beginPath(); actx.arc(88, 30, 1.8, 0, Math.PI * 2); actx.fill();
+    // Elbow joint dot
+    actx.beginPath(); actx.arc(122, 130, 1.8, 0, Math.PI * 2); actx.fill();
+    // Wrist joint dot
+    actx.beginPath(); actx.arc(87, 237, 1.2, 0, Math.PI * 2); actx.fill();
+  } else {
+    // Knee joint dot
+    actx.beginPath(); actx.arc(112, 175, 1.8, 0, Math.PI * 2); actx.fill();
+    // Ankle joint dot
+    actx.beginPath(); actx.arc(108, 290, 1.2, 0, Math.PI * 2); actx.fill();
+  }
 
   // Muscle definitions:
-  var muscles = [
+  var legMuscles = [
     {
       ch: 1,
       name: 'Rectus Femoris',
@@ -1673,6 +1816,42 @@ function updateAnatomyCanvas() {
     }
   ];
 
+  var armMuscles = [
+    {
+      ch: 1,
+      name: 'Biceps Brachii',
+      cx: 112, cy: 95, rx: 11, ry: 25, rot: 0.15,
+      color: '#00e5c8',
+      desc: 'To activate the <b>Biceps Brachii (Front Upper Arm)</b>:<br/>• Bend your elbow or curl a weight.<br/>• Rotate your forearm so your palm faces up.',
+      colorRGB: '0, 229, 200'
+    },
+    {
+      ch: 2,
+      name: 'Triceps Brachii',
+      cx: 124, cy: 95, rx: 10, ry: 26, rot: -0.15,
+      color: '#ffb300',
+      desc: 'To activate the <b>Triceps Brachii (Back Upper Arm)</b>:<br/>• Straighten your elbow (push down or back).<br/>• Extend your arm backwards.',
+      colorRGB: '255, 179, 0'
+    },
+    {
+      ch: 3,
+      name: 'Brachioradialis',
+      cx: 108, cy: 175, rx: 9, ry: 22, rot: 0.12,
+      color: '#9d4edd',
+      desc: 'To activate the <b>Brachioradialis (Forearm Extensor)</b>:<br/>• Flex your elbow with your thumb pointing upwards.<br/>• Squeeze your grip or raise your wrist.',
+      colorRGB: '157, 78, 221'
+    },
+    {
+      ch: 4,
+      name: 'Flexor Carpi',
+      cx: 95, cy: 185, rx: 8, ry: 22, rot: -0.22,
+      color: '#ff357a',
+      desc: 'To activate the <b>Flexor Carpi (Wrist Flexor)</b>:<br/>• Bend your wrist inward (palm toward forearm).<br/>• Make a tight fist or squeeze your fingers.',
+      colorRGB: '255, 53, 122'
+    }
+  ];
+
+  var muscles = isArm ? armMuscles : legMuscles;
   var activeChs = SESSION.activeChannels || [1];
   var isAuto = activeChs.length === 1 && activeChs[0] === 0;
 

@@ -31,7 +31,9 @@ var flexTimer = 0;
 var sessionStartTime = 0;
 var particles = [];
 var shake = { x: 0, y: 0, t: 0, mag: 0 };
-var waveHistory = [];     // ring buffer of RMS values for waveform
+var waveHistories = { 1: [], 2: [], 3: [], 4: [] };
+var waveHistoryCombined = [];
+var lastEmgMsg = null;
 var WAVE_POINTS = 120;    // how many samples in the waveform
 
 // ── EMG live state ───────────────────────────────────
@@ -56,7 +58,8 @@ var SESSION = {
   threshold: 30,
   baseline: 4,
   calibrated: false,
-  activeChannel: 1,   // 0 = auto (highest RMS), 1-4 = specific channel
+  activeChannels: [1],   // array of active channels, e.g. [1, 2], [1, 2, 3, 4], or [0] for Auto
+  combMode: 'avg',       // avg | max | min
 };
 
 // ── Per-hurdle log ────────────────────────────────────
@@ -336,6 +339,24 @@ function drawSingleHurdle(hx, ty, hH, num, state, now) {
   }
 }
 
+function drawLimb(ctx, x1, y1, len1, len2, angle1, angle2, color, thickness) {
+  var x2 = x1 + Math.sin(angle1) * len1;
+  var y2 = y1 + Math.cos(angle1) * len1;
+  var x3 = x2 + Math.sin(angle1 - angle2) * len2;
+  var y3 = y2 + Math.cos(angle1 - angle2) * len2;
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = thickness;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.lineTo(x3, y3);
+  ctx.stroke();
+}
+
 function drawCharacter(dt) {
   GAME.charAnimT += dt;
 
@@ -356,44 +377,92 @@ function drawCharacter(dt) {
   ctx.shadowColor = color;
   ctx.shadowBlur = (phase === 'jumping') ? 28 : 10;
 
-  // Head
+  // If hit, tumble/rotate!
+  if (phase === 'hit') {
+    var rot = (1.2 - GAME.hitTimer) * (Math.PI * 2);
+    ctx.translate(0, -CHAR_H/2);
+    ctx.rotate(rot);
+    ctx.translate(0, CHAR_H/2);
+  }
+
+  // Define key coordinates:
+  var hipY = -14;
+  var hipXLeft = -2.5;
+  var hipXRight = 2.5;
+
+  var torsoLean = (phase === 'approaching') ? 0.22 : 0; // forward tilt in radians
+  if (phase === 'jumping') torsoLean = -0.15; // backward tilt for jumping clearance!
+
+  var shoulderY = -26;
+  var shoulderXLeft = -3 + Math.sin(torsoLean) * 12;
+  var shoulderXRight = 3 + Math.sin(torsoLean) * 12;
+
+  // Compute running angles
+  var runSpeed = 15;
+  var cycle = GAME.charAnimT * runSpeed;
+
+  var thighAngle1, kneeAngle1, thighAngle2, kneeAngle2;
+  var armAngle1, forearmAngle1, armAngle2, forearmAngle2;
+
+  if (phase === 'approaching') {
+    // Dynamic running gait
+    thighAngle1 = Math.sin(cycle) * 0.7 + 0.15;
+    thighAngle2 = Math.sin(cycle + Math.PI) * 0.7 + 0.15;
+
+    kneeAngle1 = (Math.cos(cycle + Math.PI / 3) * 0.5 + 0.5) * 1.25 + 0.1;
+    kneeAngle2 = (Math.cos(cycle + Math.PI + Math.PI / 3) * 0.5 + 0.5) * 1.25 + 0.1;
+
+    armAngle1 = -Math.sin(cycle) * 0.8;
+    forearmAngle1 = (Math.sin(cycle + Math.PI / 2) * 0.35 + 0.65) * 1.3;
+
+    armAngle2 = -Math.sin(cycle + Math.PI) * 0.8;
+    forearmAngle2 = (Math.sin(cycle + Math.PI + Math.PI / 2) * 0.35 + 0.65) * 1.3;
+  } else if (phase === 'jumping') {
+    // Athletic hurdler leap pose
+    thighAngle1 = 1.3; 
+    kneeAngle1  = 0.9; 
+    thighAngle2 = -0.9; 
+    kneeAngle2  = 0.3; 
+
+    armAngle1 = -1.1; forearmAngle1 = 0.5;
+    armAngle2 = 1.1;  forearmAngle2 = 0.5;
+  } else if (phase === 'hit') {
+    // Sprawled out tumble pose
+    thighAngle1 = 0.9; kneeAngle1 = 1.1;
+    thighAngle2 = -0.5; kneeAngle2 = 1.3;
+    armAngle1 = -1.3; forearmAngle1 = 0.8;
+    armAngle2 = 1.3; forearmAngle2 = 0.8;
+  } else {
+    // Idle/Resting upright pose
+    thighAngle1 = 0.05; kneeAngle1 = 0.05;
+    thighAngle2 = -0.05; kneeAngle2 = 0.05;
+    armAngle1 = 0.1; forearmAngle1 = 0.1;
+    armAngle2 = -0.1; forearmAngle2 = 0.1;
+  }
+
+  // Draw Layers for depth (Back Arm -> Back Leg -> Torso/Head -> Front Leg -> Front Arm)
+  drawLimb(ctx, shoulderXLeft, shoulderY, 7, 7, armAngle2, -forearmAngle2, color + 'aa', 2.2);
+  drawLimb(ctx, hipXLeft, hipY, 9, 9, thighAngle2, kneeAngle2, color + 'aa', 3.0);
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, hipY);
+  ctx.lineTo(Math.sin(torsoLean) * 12, shoulderY);
+  ctx.stroke();
+
+  var neckX = Math.sin(torsoLean) * 12;
+  var headX = neckX + Math.sin(torsoLean) * 4;
+  var headY = shoulderY - 7;
+  
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.arc(0, -CHAR_H + 7, 6, 0, Math.PI * 2);
+  ctx.arc(headX, headY, 4.5, 0, Math.PI * 2);
   ctx.fill();
 
-  // Body
-  ctx.fillStyle = color + 'cc';
-  ctx.fillRect(-CHAR_W/2 + 1, -CHAR_H + 13, CHAR_W - 2, 16);
-
-  // Legs (walking animation)
-  var walk = (phase === 'approaching') ? Math.sin(GAME.charAnimT * 9) * 8 : 0;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3.5;
-  ctx.lineCap = 'round';
-
-  // Left leg
-  ctx.beginPath();
-  ctx.moveTo(-3, -CHAR_H + 29);
-  ctx.lineTo(-5 + walk, -CHAR_H + CHAR_H - 1);
-  ctx.stroke();
-  // Right leg
-  ctx.beginPath();
-  ctx.moveTo(3, -CHAR_H + 29);
-  ctx.lineTo(5 - walk, -CHAR_H + CHAR_H - 1);
-  ctx.stroke();
-
-  // Arms
-  var armSwing = (phase === 'approaching') ? Math.sin(GAME.charAnimT * 9 + Math.PI) * 6 : 0;
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(-5, -CHAR_H + 16);
-  ctx.lineTo(-10 - armSwing, -CHAR_H + 22);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(5, -CHAR_H + 16);
-  ctx.lineTo(10 + armSwing, -CHAR_H + 22);
-  ctx.stroke();
+  drawLimb(ctx, hipXRight, hipY, 9, 9, thighAngle1, kneeAngle1, color, 3.3);
+  drawLimb(ctx, shoulderXRight, shoulderY, 7, 7, armAngle1, -forearmAngle1, color, 2.5);
 
   ctx.shadowBlur = 0;
   ctx.restore();
@@ -442,8 +511,28 @@ function drawParticles(dt) {
 // ══════════════════════════════════════════════════════
 
 function updateWaveform() {
-  waveHistory.push(EMG.rms);
-  if (waveHistory.length > WAVE_POINTS) waveHistory.shift();
+  // Push current values to histories at frame rate
+  var msg = lastEmgMsg;
+  if (msg && msg.channels) {
+    [1, 2, 3, 4].forEach(function(chId) {
+      var chObj = msg.channels.find(function(c) { return c.ch === chId; });
+      var val = chObj ? (chObj.rms || 0) : 0;
+      if (!waveHistories[chId]) waveHistories[chId] = [];
+      waveHistories[chId].push(val);
+      if (waveHistories[chId].length > WAVE_POINTS) waveHistories[chId].shift();
+    });
+  } else {
+    [1, 2, 3, 4].forEach(function(chId) {
+      var active = SESSION.activeChannels || [1];
+      var val = (EMG.live) ? 0 : (active.indexOf(chId) !== -1 || (active.length === 1 && active[0] === 0) ? EMG.rms : 0);
+      if (!waveHistories[chId]) waveHistories[chId] = [];
+      waveHistories[chId].push(val);
+      if (waveHistories[chId].length > WAVE_POINTS) waveHistories[chId].shift();
+    });
+  }
+
+  waveHistoryCombined.push(EMG.rms);
+  if (waveHistoryCombined.length > WAVE_POINTS) waveHistoryCombined.shift();
 
   var wc = document.getElementById('wave-canvas');
   if (!wc) return;
@@ -455,13 +544,7 @@ function updateWaveform() {
 
   wctx.clearRect(0, 0, wW, wH);
 
-  // Background
-  wctx.fillStyle = 'transparent';
-  wctx.fillRect(0, 0, wW, wH);
-
-  if (waveHistory.length < 2) return;
-
-  // Threshold line
+  // Draw threshold line
   var tPct = Math.min(SESSION.threshold / 300, 1);
   var tY   = wH - tPct * wH * 0.85 - 4;
   wctx.strokeStyle = 'rgba(255,255,255,0.2)';
@@ -472,35 +555,66 @@ function updateWaveform() {
   wctx.stroke();
   wctx.setLineDash([]);
 
-  // EMG trace
-  var pts = waveHistory;
+  var active = SESSION.activeChannels || [1];
+  var isAuto = active.length === 1 && active[0] === 0;
   var step = wW / (WAVE_POINTS - 1);
-  var grad = wctx.createLinearGradient(0, 0, wW, 0);
-  grad.addColorStop(0, 'rgba(0,229,200,0.2)');
-  grad.addColorStop(1, 'rgba(0,229,200,0.9)');
-  wctx.strokeStyle = grad;
-  wctx.lineWidth = 1.5;
-  wctx.shadowColor = '#00e5c8';
-  wctx.shadowBlur = 5;
-  wctx.beginPath();
-  for (var i = 0; i < pts.length; i++) {
-    var px = i * step;
-    var py = wH - (Math.min(pts[i], 300) / 300) * wH * 0.85 - 4;
-    if (i === 0) wctx.moveTo(px, py);
-    else         wctx.lineTo(px, py);
-  }
-  wctx.stroke();
-  wctx.shadowBlur = 0;
 
-  // Fill below curve
-  wctx.lineTo((pts.length - 1) * step, wH);
-  wctx.lineTo(0, wH);
-  wctx.closePath();
-  var fillGrad = wctx.createLinearGradient(0, 0, 0, wH);
-  fillGrad.addColorStop(0, 'rgba(0,229,200,0.12)');
-  fillGrad.addColorStop(1, 'rgba(0,229,200,0)');
-  wctx.fillStyle = fillGrad;
-  wctx.fill();
+  // 1. Draw individual active channels in their respective colors
+  var chColors = {
+    1: 'rgba(0, 229, 200, 0.45)',  // Teal
+    2: 'rgba(255, 179, 0, 0.45)',  // Amber
+    3: 'rgba(157, 78, 221, 0.45)',  // Purple
+    4: 'rgba(255, 53, 122, 0.45)'   // Magenta
+  };
+
+  var channelsToDraw = isAuto ? [1, 2, 3, 4] : active;
+  channelsToDraw.forEach(function(ch) {
+    var pts = waveHistories[ch];
+    if (!pts || pts.length < 2) return;
+
+    wctx.strokeStyle = chColors[ch] || 'rgba(255,255,255,0.3)';
+    wctx.lineWidth = 1;
+    wctx.beginPath();
+    for (var i = 0; i < pts.length; i++) {
+      var px = i * step;
+      var py = wH - (Math.min(pts[i], 300) / 300) * wH * 0.85 - 4;
+      if (i === 0) wctx.moveTo(px, py);
+      else         wctx.lineTo(px, py);
+    }
+    wctx.stroke();
+  });
+
+  // 2. Draw combined signal as a thick glowing white line
+  if (waveHistoryCombined.length >= 2) {
+    var pts = waveHistoryCombined;
+    var grad = wctx.createLinearGradient(0, 0, wW, 0);
+    grad.addColorStop(0, 'rgba(255,255,255,0.4)');
+    grad.addColorStop(1, 'rgba(255,255,255,0.95)');
+    
+    wctx.strokeStyle = grad;
+    wctx.lineWidth = 2.2;
+    wctx.shadowColor = '#ffffff';
+    wctx.shadowBlur = 4;
+    wctx.beginPath();
+    for (var i = 0; i < pts.length; i++) {
+      var px = i * step;
+      var py = wH - (Math.min(pts[i], 300) / 300) * wH * 0.85 - 4;
+      if (i === 0) wctx.moveTo(px, py);
+      else         wctx.lineTo(px, py);
+    }
+    wctx.stroke();
+    wctx.shadowBlur = 0;
+
+    // Fill area below combined line
+    wctx.lineTo((pts.length - 1) * step, wH);
+    wctx.lineTo(0, wH);
+    wctx.closePath();
+    var fillGrad = wctx.createLinearGradient(0, 0, 0, wH);
+    fillGrad.addColorStop(0, 'rgba(0,229,200,0.1)');
+    fillGrad.addColorStop(1, 'rgba(0,229,200,0)');
+    wctx.fillStyle = fillGrad;
+    wctx.fill();
+  }
 }
 
 // ══════════════════════════════════════════════════════
@@ -676,7 +790,8 @@ function beginAtHurdle() {
   GAME.currentPeakEMG = 0;
   flexThresholdHeld = 0;
   flexTimer = SESSION.attemptTimeLimit;
-  waveHistory = []; // fresh trace per attempt
+  waveHistories = { 1: [], 2: [], 3: [], 4: [] };
+  waveHistoryCombined = [];
 
   // Increment attempt counter for this hurdle
   GAME.totalAttemptsThisHurdle++;
@@ -757,7 +872,7 @@ function onLanded() {
 function makeAttemptRecord(outcome) {
   var now = Date.now();
   var duration = now - GAME.currentAttemptStart;
-  var trace = waveHistory.slice();
+  var trace = waveHistoryCombined.slice();
   var meanEMG = 0;
   if (trace.length) {
     meanEMG = trace.reduce(function(s, v) { return s + v; }, 0) / trace.length;
@@ -1117,14 +1232,53 @@ function initSetupForm() {
   chBtns.forEach(function(btn) {
     btn.addEventListener('click', function() {
       var ch = parseInt(this.getAttribute('data-ch'));
-      SESSION.activeChannel = ch;
-      chBtns.forEach(function(b) { b.classList.remove('active'); });
-      this.classList.add('active');
-      var label = ch === 0 ? 'AUTO' : 'CH' + ch;
+      if (!SESSION.activeChannels) SESSION.activeChannels = [1];
+      
+      if (ch === 0) {
+        // Auto mode
+        SESSION.activeChannels = [0];
+        chBtns.forEach(function(b) {
+          if (parseInt(b.getAttribute('data-ch')) === 0) b.classList.add('active');
+          else b.classList.remove('active');
+        });
+      } else {
+        // Specific channel toggled
+        var index0 = SESSION.activeChannels.indexOf(0);
+        if (index0 !== -1) SESSION.activeChannels.splice(index0, 1);
+        $('ch-btn-0').classList.remove('active');
+        
+        var index = SESSION.activeChannels.indexOf(ch);
+        if (index !== -1) {
+          if (SESSION.activeChannels.length > 1) {
+            SESSION.activeChannels.splice(index, 1);
+            this.classList.remove('active');
+          }
+        } else {
+          SESSION.activeChannels.push(ch);
+          this.classList.add('active');
+        }
+      }
+      
+      // Update visibility of the combination mode select
+      var combRow = $('comb-mode-row');
+      if (combRow) {
+        combRow.style.display = SESSION.activeChannels.length > 1 ? 'block' : 'none';
+      }
+      
+      SESSION.activeChannels.sort(function(a, b) { return a - b; });
+
+      var label = SESSION.activeChannels.map(function(c) { return c === 0 ? 'AUTO' : 'CH' + c; }).join('+');
       var preview = $('ch-live-preview');
       if (preview) preview.textContent = 'Live RMS: — mV  [' + label + ' selected]';
     });
   });
+
+  var combModeSelect = $('inp-comb-mode');
+  if (combModeSelect) {
+    combModeSelect.addEventListener('change', function() {
+      SESSION.combMode = this.value;
+    });
+  }
 
   $('calib-sample-btn').addEventListener('click', startSampleFlex);
   $('skip-calib-btn').addEventListener('click', skipCalib);
@@ -1195,7 +1349,8 @@ function startProtocol() {
   GAME.totalAttemptsThisHurdle = 0;
   HURDLE_LOG.length = 0;
   particles.length  = 0;
-  waveHistory.length = 0;
+  waveHistories = { 1: [], 2: [], 3: [], 4: [] };
+  waveHistoryCombined = [];
 
   hideOverlay('setup-overlay');
   beginCountdown();
@@ -1204,12 +1359,12 @@ function startProtocol() {
 function beginCountdown() {
   if (restInterval) clearInterval(restInterval);
   showOverlay('cd-overlay');
-  $('cd-big').textContent = '3';
+  $('cd-big').textContent = '1';
   $('cd-sub').textContent = 'GET READY';
   $('cd-sub').style.color = '';
   startLoop();
 
-  var n = 3;
+  var n = 1;
   restInterval = setInterval(function() {
     n--;
     if (n > 0) {
@@ -1236,7 +1391,7 @@ function beginRestPhase() {
   
   if (restInterval) clearInterval(restInterval);
 
-  var secondsLeft = 5;
+  var secondsLeft = 2;
   $('cd-big').textContent = secondsLeft;
   $('cd-sub').textContent = 'REST & RELAX YOUR MUSCLE';
   $('cd-sub').style.color = '#ffb300';
@@ -1254,7 +1409,7 @@ function beginRestPhase() {
 }
 
 function beginReadyPhase() {
-  var secondsLeft = 2;
+  var secondsLeft = 1;
   $('cd-big').textContent = secondsLeft;
   $('cd-sub').textContent = 'GET READY FOR NEXT HURDLE';
   $('cd-sub').style.color = '#00e5c8';
@@ -1334,22 +1489,42 @@ function onEmgUpdate(ev) {
   var msg = ev.detail;
   if (!msg || msg.type !== 'channels' || !Array.isArray(msg.channels) || !msg.channels.length) return;
 
+  lastEmgMsg = msg; // Save last message for graph rendering
+
   var live = msg.channels.filter(function(c) { return (c.sample_rate || 0) > 0; });
   var pool = live.length > 0 ? live : msg.channels;
 
-  var chosen;
-  if (SESSION.activeChannel === 0) {
+  // Determine active channel configuration
+  var activeChs = SESSION.activeChannels || [1];
+  if (activeChs.length === 1 && activeChs[0] === 0) {
     // Auto: highest RMS among live channels
-    chosen = pool.reduce(function(b, c) { return (c.rms || 0) > (b.rms || 0) ? c : b; }, pool[0]);
+    var chosen = pool.reduce(function(b, c) { return (c.rms || 0) > (b.rms || 0) ? c : b; }, pool[0]);
+    EMG.rms = chosen.rms || 0;
+    EMG.channel = chosen.ch || '?';
   } else {
-    // User-selected channel
-    chosen = msg.channels.find(function(c) { return c.ch === SESSION.activeChannel; });
-    if (!chosen) chosen = pool[0]; // fallback if that channel has no data yet
+    // Specific channels mode: average, max, or min of selected channels
+    var targetChannels = msg.channels.filter(function(c) { return activeChs.indexOf(c.ch) !== -1; });
+    if (targetChannels.length === 0) {
+      targetChannels = [pool[0]]; // fallback
+    }
+    
+    var rmsValues = targetChannels.map(function(c) { return c.rms || 0; });
+    var combVal = 0;
+    if (SESSION.combMode === 'max') {
+      combVal = Math.max.apply(null, rmsValues);
+    } else if (SESSION.combMode === 'min') {
+      combVal = Math.min.apply(null, rmsValues);
+    } else {
+      // default: avg
+      var sum = rmsValues.reduce(function(a, b) { return a + b; }, 0);
+      combVal = sum / rmsValues.length;
+    }
+    
+    EMG.rms = combVal;
+    EMG.channel = activeChs.join('+');
   }
 
-  EMG.rms     = chosen.rms || 0;
-  EMG.channel = chosen.ch  || SESSION.activeChannel;
-  EMG.live    = msg.connected && live.length > 0;
+  EMG.live = msg.connected && live.length > 0;
 
   $('ws-dot').className = EMG.live ? 'on' : (msg.connected ? 'on' : '');
   $('ws-lbl').textContent = EMG.live
@@ -1361,8 +1536,11 @@ function onEmgUpdate(ev) {
   // Update live RMS preview per button in setup panel
   var preview = $('ch-live-preview');
   if (preview) {
-    var rmsVal = chosen ? Math.round(chosen.rms || 0) : 0;
-    var label  = SESSION.activeChannel === 0 ? 'AUTO · CH' + EMG.channel : 'CH' + SESSION.activeChannel;
+    var rmsVal = Math.round(EMG.rms);
+    var label = activeChs.map(function(c) { return c === 0 ? 'AUTO' : 'CH' + c; }).join('+');
+    if (activeChs.length > 1) {
+      label += ' (' + SESSION.combMode.toUpperCase() + ')';
+    }
     preview.textContent = 'Live RMS: ' + rmsVal + ' mV  [' + label + ']';
     preview.style.color = rmsVal > 50 ? '#00e5a0' : '#8b949e';
   }

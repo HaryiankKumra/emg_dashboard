@@ -111,7 +111,7 @@
           </div>
 
           <div class="form-row">
-            <label class="form-lbl">Control Channel (which muscle to use)</label>
+            <label class="form-lbl">Control Channels (select one or more muscles)</label>
             <div class="channel-picker" id="channel-picker">
               <button type="button" class="ch-btn" data-ch="0" id="ch-btn-0">🤖 Auto (Highest RMS)</button>
               <button type="button" class="ch-btn active" data-ch="1" id="ch-btn-1">CH1 — Rectus Femoris</button>
@@ -120,6 +120,15 @@
               <button type="button" class="ch-btn" data-ch="4" id="ch-btn-4">CH4 — Spare</button>
             </div>
             <div class="ch-live-preview" id="ch-live-preview">Live RMS: — mV</div>
+          </div>
+
+          <div class="form-row" id="comb-mode-row" style="display: none;">
+            <label class="form-lbl">Multi-Muscle Control Mode</label>
+            <select id="inp-comb-mode" class="form-inp">
+              <option value="avg" selected>Average RMS (Smooth combined effort)</option>
+              <option value="max">Max RMS (Any muscle above threshold)</option>
+              <option value="min">Min RMS (All muscles above threshold simultaneously)</option>
+            </select>
           </div>
         </div>
       </div>

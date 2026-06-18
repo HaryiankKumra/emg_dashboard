@@ -509,3 +509,47 @@ input[type=range]::-webkit-slider-thumb {
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ─── CHANNEL PICKER ──────────────────────────────────── */
+.channel-picker {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-top: 4px;
+}
+
+.ch-btn {
+  flex: 1 1 auto;
+  padding: 9px 14px;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  color: var(--muted);
+  font-family: var(--font-tech);
+  font-size: 9.5px; letter-spacing: 1px;
+  cursor: pointer; transition: all 0.18s;
+  white-space: nowrap;
+}
+
+.ch-btn:hover {
+  border-color: rgba(0,229,200,0.30);
+  color: var(--teal);
+  background: rgba(0,229,200,0.05);
+}
+
+.ch-btn.active {
+  background: rgba(0,229,200,0.10);
+  border-color: var(--teal);
+  color: var(--teal);
+  box-shadow: 0 0 12px rgba(0,229,200,0.18);
+}
+
+.ch-live-preview {
+  font-family: var(--font-tech);
+  font-size: 10px; letter-spacing: 1px;
+  color: var(--muted);
+  margin-top: 7px;
+  padding: 6px 10px;
+  background: rgba(0,0,0,0.25);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.04);
+  transition: color 0.3s;
+}

@@ -55,6 +55,7 @@ var SESSION = {
   threshold: 30,
   baseline: 4,
   calibrated: false,
+  activeChannel: 1,   // 0 = auto (highest RMS), 1-4 = specific channel
 };
 
 // ── Per-hurdle log ────────────────────────────────────
@@ -1109,6 +1110,21 @@ function initSetupForm() {
     SESSION.attemptTimeLimit = parseInt(this.value);
     $('timelimit-val').textContent = this.value + ' s';
   });
+
+  // ── Channel picker ────────────────────────────────
+  var chBtns = document.querySelectorAll('.ch-btn');
+  chBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var ch = parseInt(this.getAttribute('data-ch'));
+      SESSION.activeChannel = ch;
+      chBtns.forEach(function(b) { b.classList.remove('active'); });
+      this.classList.add('active');
+      var label = ch === 0 ? 'AUTO' : 'CH' + ch;
+      var preview = $('ch-live-preview');
+      if (preview) preview.textContent = 'Live RMS: — mV  [' + label + ' selected]';
+    });
+  });
+
   $('calib-sample-btn').addEventListener('click', startSampleFlex);
   $('skip-calib-btn').addEventListener('click', skipCalib);
   $('start-btn').addEventListener('click', startProtocol);
@@ -1118,6 +1134,7 @@ function initSetupForm() {
   $('export-emg-raw-btn').addEventListener('click', function() { exportGameEMGCSV(false); });
   $('new-session-btn').addEventListener('click', resetToSetup);
 }
+
 
 function readGameSessionMeta() {
   return {
@@ -1268,10 +1285,19 @@ function onEmgUpdate(ev) {
 
   var live = msg.channels.filter(function(c) { return (c.sample_rate || 0) > 0; });
   var pool = live.length > 0 ? live : msg.channels;
-  var best = pool.reduce(function(b, c) { return (c.rms || 0) > (b.rms || 0) ? c : b; }, pool[0]);
 
-  EMG.rms     = best.rms || 0;
-  EMG.channel = best.ch  || '?';
+  var chosen;
+  if (SESSION.activeChannel === 0) {
+    // Auto: highest RMS among live channels
+    chosen = pool.reduce(function(b, c) { return (c.rms || 0) > (b.rms || 0) ? c : b; }, pool[0]);
+  } else {
+    // User-selected channel
+    chosen = msg.channels.find(function(c) { return c.ch === SESSION.activeChannel; });
+    if (!chosen) chosen = pool[0]; // fallback if that channel has no data yet
+  }
+
+  EMG.rms     = chosen.rms || 0;
+  EMG.channel = chosen.ch  || SESSION.activeChannel;
   EMG.live    = msg.connected && live.length > 0;
 
   $('ws-dot').className = EMG.live ? 'on' : (msg.connected ? 'on' : '');
@@ -1280,6 +1306,15 @@ function onEmgUpdate(ev) {
     : (msg.connected ? 'EMG WAITING' : 'EMG OFFLINE');
 
   if ($('fs-channel')) $('fs-channel').textContent = 'CH' + EMG.channel;
+
+  // Update live RMS preview per button in setup panel
+  var preview = $('ch-live-preview');
+  if (preview) {
+    var rmsVal = chosen ? Math.round(chosen.rms || 0) : 0;
+    var label  = SESSION.activeChannel === 0 ? 'AUTO · CH' + EMG.channel : 'CH' + SESSION.activeChannel;
+    preview.textContent = 'Live RMS: ' + rmsVal + ' mV  [' + label + ']';
+    preview.style.color = rmsVal > 50 ? '#00e5a0' : '#8b949e';
+  }
 }
 
 // ══════════════════════════════════════════════════════

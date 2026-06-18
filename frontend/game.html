@@ -109,6 +109,18 @@
               <span class="slider-val" id="timelimit-val">5 s</span>
             </div>
           </div>
+
+          <div class="form-row">
+            <label class="form-lbl">Control Channel (which muscle to use)</label>
+            <div class="channel-picker" id="channel-picker">
+              <button type="button" class="ch-btn" data-ch="0" id="ch-btn-0">🤖 Auto (Highest RMS)</button>
+              <button type="button" class="ch-btn active" data-ch="1" id="ch-btn-1">CH1 — Rectus Femoris</button>
+              <button type="button" class="ch-btn" data-ch="2" id="ch-btn-2">CH2 — Biceps Femoris</button>
+              <button type="button" class="ch-btn" data-ch="3" id="ch-btn-3">CH3 — Gastrocnemius</button>
+              <button type="button" class="ch-btn" data-ch="4" id="ch-btn-4">CH4 — Spare</button>
+            </div>
+            <div class="ch-live-preview" id="ch-live-preview">Live RMS: — mV</div>
+          </div>
         </div>
       </div>
 

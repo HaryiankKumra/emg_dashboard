@@ -24,6 +24,7 @@ var wsDelay = 1200;
 var rafId = null;
 var lastTs = null;
 var calibInterval = null;
+var restInterval = null;
 var calibElapsed = 0;
 var flexThresholdHeld = 0;
 var flexTimer = 0;
@@ -748,8 +749,8 @@ function onLanded() {
     GAME.phase = 'complete';
     setTimeout(completeSession, 900);
   } else {
-    // ─── NEXT HURDLE ───
-    beginApproach(GAME.currentHurdle);
+    // ─── NEXT HURDLE (with Rest Period) ───
+    beginRestPhase();
   }
 }
 
@@ -1201,20 +1202,23 @@ function startProtocol() {
 }
 
 function beginCountdown() {
+  if (restInterval) clearInterval(restInterval);
   showOverlay('cd-overlay');
   $('cd-big').textContent = '3';
   $('cd-sub').textContent = 'GET READY';
+  $('cd-sub').style.color = '';
   startLoop();
 
   var n = 3;
-  var iv = setInterval(function() {
+  restInterval = setInterval(function() {
     n--;
     if (n > 0) {
       $('cd-big').textContent = n;
     } else {
       $('cd-big').textContent = 'GO!';
       $('cd-sub').textContent = '💪 FLEX TO JUMP!';
-      clearInterval(iv);
+      clearInterval(restInterval);
+      restInterval = null;
       setTimeout(function() {
         hideOverlay('cd-overlay');
         sessionStartTime = Date.now();
@@ -1226,7 +1230,54 @@ function beginCountdown() {
   }, 950);
 }
 
+function beginRestPhase() {
+  GAME.phase = 'resting';
+  showOverlay('cd-overlay');
+  
+  if (restInterval) clearInterval(restInterval);
+
+  var secondsLeft = 5;
+  $('cd-big').textContent = secondsLeft;
+  $('cd-sub').textContent = 'REST & RELAX YOUR MUSCLE';
+  $('cd-sub').style.color = '#ffb300';
+
+  restInterval = setInterval(function() {
+    secondsLeft--;
+    if (secondsLeft > 0) {
+      $('cd-big').textContent = secondsLeft;
+    } else {
+      clearInterval(restInterval);
+      restInterval = null;
+      beginReadyPhase();
+    }
+  }, 1000);
+}
+
+function beginReadyPhase() {
+  var secondsLeft = 2;
+  $('cd-big').textContent = secondsLeft;
+  $('cd-sub').textContent = 'GET READY FOR NEXT HURDLE';
+  $('cd-sub').style.color = '#00e5c8';
+
+  restInterval = setInterval(function() {
+    secondsLeft--;
+    if (secondsLeft > 0) {
+      $('cd-big').textContent = secondsLeft;
+    } else {
+      clearInterval(restInterval);
+      restInterval = null;
+      hideOverlay('cd-overlay');
+      $('cd-sub').style.color = ''; // Restore default color
+      beginApproach(GAME.currentHurdle);
+    }
+  }, 1000);
+}
+
 function resetToSetup() {
+  if (restInterval) {
+    clearInterval(restInterval);
+    restInterval = null;
+  }
   hideAllOverlays();
   SESSION.calibrated = false;
   $('start-btn').disabled = true;

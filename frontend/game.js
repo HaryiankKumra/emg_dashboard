@@ -1544,6 +1544,7 @@ function onEmgUpdate(ev) {
     preview.textContent = 'Live RMS: ' + rmsVal + ' mV  [' + label + ']';
     preview.style.color = rmsVal > 50 ? '#00e5a0' : '#8b949e';
   }
+  updateAnatomyCanvas();
 }
 
 // ══════════════════════════════════════════════════════
@@ -1574,6 +1575,165 @@ function flashScreen(color) {
   app.classList.remove('flash-green', 'flash-red');
   void app.offsetWidth; // force reflow
   app.classList.add(color === 'green' ? 'flash-green' : 'flash-red');
+}
+
+function updateAnatomyCanvas() {
+  var canvas = $('anatomy-canvas');
+  if (!canvas) return;
+  var actx = canvas.getContext('2d');
+  var w = canvas.width;
+  var h = canvas.height;
+
+  actx.clearRect(0, 0, w, h);
+
+  // Draw technological background grid
+  actx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
+  actx.lineWidth = 1;
+  for (var x = 0; x < w; x += 20) {
+    actx.beginPath(); actx.moveTo(x, 0); actx.lineTo(x, h); actx.stroke();
+  }
+  for (var y = 0; y < h; y += 20) {
+    actx.beginPath(); actx.moveTo(0, y); actx.lineTo(w, y); actx.stroke();
+  }
+
+  // Silhouette coordinate points for the leg model (facing left)
+  var points = [
+    {x: 120, y: 25},  // Hip top
+    {x: 95,  y: 125}, // Front thigh
+    {x: 102, y: 175}, // Knee cap
+    {x: 95,  y: 265}, // Shin
+    {x: 102, y: 285}, // Ankle top
+    {x: 80,  y: 295}, // Foot top
+    {x: 55,  y: 305}, // Toe
+    {x: 55,  y: 310}, // Toe sole
+    {x: 108, y: 310}, // Heel sole
+    {x: 118, y: 295}, // Heel
+    {x: 132, y: 235}, // Calf
+    {x: 122, y: 175}, // Back knee
+    {x: 142, y: 105}, // Back thigh
+    {x: 145, y: 45}   // Buttocks
+  ];
+
+  // Draw outline
+  actx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+  actx.lineWidth = 3;
+  actx.lineCap = 'round';
+  actx.lineJoin = 'round';
+  actx.beginPath();
+  actx.moveTo(points[0].x, points[0].y);
+  for (var i = 1; i < points.length; i++) {
+    actx.lineTo(points[i].x, points[i].y);
+  }
+  actx.closePath();
+  actx.stroke();
+
+  actx.fillStyle = 'rgba(255, 255, 255, 0.02)';
+  actx.fill();
+
+  // Knee joint dot
+  actx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+  actx.beginPath(); actx.arc(112, 175, 3.5, 0, Math.PI * 2); actx.fill();
+
+  // Ankle joint dot
+  actx.beginPath(); actx.arc(108, 290, 2.5, 0, Math.PI * 2); actx.fill();
+
+  // Muscle definitions:
+  var muscles = [
+    {
+      ch: 1,
+      name: 'Rectus Femoris',
+      cx: 111, cy: 100, rx: 14, ry: 33, rot: 0.12,
+      color: '#00e5c8',
+      desc: 'To activate the <b>Rectus Femoris (Front Thigh)</b>:<br/>• Straighten your knee or push leg upward.<br/>• Squat down and rise up under load.',
+      colorRGB: '0, 229, 200'
+    },
+    {
+      ch: 2,
+      name: 'Biceps Femoris',
+      cx: 131, cy: 110, rx: 12, ry: 28, rot: 0.14,
+      color: '#ffb300',
+      desc: 'To activate the <b>Biceps Femoris (Back Thigh)</b>:<br/>• Bend your knee or pull your heel backward.<br/>• Resist extension of the leg.',
+      colorRGB: '255, 179, 0'
+    },
+    {
+      ch: 3,
+      name: 'Gastrocnemius',
+      cx: 124, cy: 225, rx: 11, ry: 24, rot: -0.10,
+      color: '#9d4edd',
+      desc: 'To activate the <b>Gastrocnemius (Calf)</b>:<br/>• Point your toes down (plantar flexion).<br/>• Raise your heels off the ground.',
+      colorRGB: '157, 78, 221'
+    },
+    {
+      ch: 4,
+      name: 'Spare Muscle',
+      cx: 107, cy: 230, rx: 8, ry: 22, rot: 0.05,
+      color: '#ff357a',
+      desc: 'To activate the <b>Auxiliary Target Muscle</b>:<br/>• Contract the secondary targeted muscle group.<br/>• Ensure correct electrode placement.',
+      colorRGB: '255, 53, 122'
+    }
+  ];
+
+  var activeChs = SESSION.activeChannels || [1];
+  var isAuto = activeChs.length === 1 && activeChs[0] === 0;
+
+  var pulse = Math.sin(Date.now() / 220) * 0.22 + 0.68;
+  var guideHtml = '<h4>Muscle Activation Guide</h4>';
+  var activeDescriptions = [];
+
+  muscles.forEach(function(m) {
+    var isActive = isAuto || activeChs.indexOf(m.ch) !== -1;
+    if (isActive) {
+      actx.save();
+      actx.shadowColor = m.color;
+      actx.shadowBlur = 14 * pulse;
+      actx.fillStyle = 'rgba(' + m.colorRGB + ', ' + (0.32 * pulse) + ')';
+      actx.strokeStyle = m.color;
+      actx.lineWidth = 1.8;
+      
+      actx.beginPath();
+      actx.ellipse(m.cx, m.cy, m.rx, m.ry, m.rot, 0, Math.PI * 2);
+      actx.fill();
+      actx.stroke();
+
+      // Dashed connector
+      actx.strokeStyle = 'rgba(' + m.colorRGB + ', 0.65)';
+      actx.lineWidth = 1;
+      actx.setLineDash([2, 2]);
+      actx.beginPath();
+      actx.moveTo(m.cx, m.cy);
+      
+      var lx = m.cx > 115 ? w - 35 : 35;
+      var ly = m.cy - 12;
+      actx.lineTo(lx, ly);
+      actx.stroke();
+      actx.setLineDash([]);
+      
+      // Label texts
+      actx.shadowBlur = 0;
+      actx.fillStyle = m.color;
+      actx.font = 'bold 9px Orbitron';
+      actx.textAlign = m.cx > 115 ? 'right' : 'left';
+      actx.fillText('CH' + m.ch, lx, ly - 4);
+      actx.fillStyle = '#ffffff';
+      actx.font = '7.5px Inter';
+      actx.fillText(m.name.toUpperCase(), lx, ly + 6);
+
+      actx.restore();
+
+      activeDescriptions.push(m.desc);
+    }
+  });
+
+  var guideBox = $('guide-box');
+  if (guideBox && activeDescriptions.length > 0) {
+    guideHtml += activeDescriptions.join('<br/><hr style="border:none;border-top:1px solid rgba(255,255,255,0.06);margin:8px 0;"/>');
+    if (activeChs.length > 1) {
+      guideHtml += '<br/><span style="color:#ffb300;font-size:10.5px;display:block;margin-top:6px;line-height:1.4;">⚠️ <b>Multi-Muscle Constraint:</b> In Min RMS mode, all selected muscles must cross threshold together to trigger jump.</span>';
+    }
+    if (guideBox.innerHTML !== guideHtml) {
+      guideBox.innerHTML = guideHtml;
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════
@@ -1626,6 +1786,8 @@ connectEMG();
   ctx.fillStyle = 'rgba(0,229,200,0.06)';
   ctx.font = 'bold 11px Orbitron'; ctx.textAlign = 'right';
   ctx.fillText('MyoHurdle Protocol v1.0', W - 20, H - 18);
+
+  updateAnatomyCanvas();
 
   requestAnimationFrame(staticBg);
 })();

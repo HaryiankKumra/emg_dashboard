@@ -102,7 +102,7 @@ html, body {
   scrollbar-color: var(--border) transparent;
 }
 
-.setup-panel   { width: min(520px, 96vw); }
+.setup-panel   { width: min(940px, 96vw); }
 .calib-panel   { width: min(420px, 96vw); text-align: center; }
 .results-panel { width: min(820px, 96vw); }
 
@@ -553,3 +553,47 @@ input[type=range]::-webkit-slider-thumb {
   border: 1px solid rgba(255,255,255,0.04);
   transition: color 0.3s;
 }
+
+/* ─── SETUP GRID AND GUIDE ───────────────────────────── */
+.setup-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .setup-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.anatomy-wrap {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 15px;
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.guide-box {
+  background: rgba(0, 229, 200, 0.04);
+  border: 1px solid rgba(0, 229, 200, 0.12);
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+  font-family: var(--font-tech);
+}
+
+.guide-box h4 {
+  margin: 0 0 6px 0;
+  color: var(--teal);
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+

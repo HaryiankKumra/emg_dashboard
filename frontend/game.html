@@ -34,126 +34,152 @@
         <div class="brand-sub">EMG MOTOR TRAINING PROTOCOL</div>
       </div>
 
-      <!-- Step 1: Basic params -->
-      <div class="step-card">
-        <div class="step-num">STEP 1</div>
-        <div class="step-title">Protocol Parameters</div>
+      <div class="setup-grid">
+        
+        <!-- Left Column: Settings -->
+        <div class="setup-col-left">
+          
+          <!-- Step 1: Basic params -->
+          <div class="step-card">
+            <div class="step-num">STEP 1</div>
+            <div class="step-title">Protocol Parameters</div>
 
-        <div class="form-grid">
-          <div class="form-row">
-            <label class="form-lbl">Participant ID</label>
-            <input id="inp-name" class="form-inp" type="text" placeholder="e.g. P001" value="P001" autocomplete="off">
+            <div class="form-grid">
+              <div class="form-row">
+                <label class="form-lbl">Participant ID</label>
+                <input id="inp-name" class="form-inp" type="text" placeholder="e.g. P001" value="P001" autocomplete="off">
+              </div>
+
+              <div class="form-row form-row-2">
+                <div>
+                  <label class="form-lbl">Sex</label>
+                  <select id="inp-sex" class="form-inp">
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-lbl">Age (years)</label>
+                  <input id="inp-age" class="form-inp" type="number" min="10" max="100" value="25">
+                </div>
+              </div>
+
+              <div class="form-row form-row-2">
+                <div>
+                  <label class="form-lbl">Weight (kg)</label>
+                  <input id="inp-weight" class="form-inp" type="number" min="20" max="300" step="0.5" value="70">
+                </div>
+                <div>
+                  <label class="form-lbl">Height (cm)</label>
+                  <input id="inp-height" class="form-inp" type="number" min="100" max="250" step="1" value="170">
+                </div>
+              </div>
+
+              <div class="form-row form-row-2">
+                <div>
+                  <label class="form-lbl">Leg Exercise</label>
+                  <select id="inp-exercise" class="form-inp">
+                    <option value="jump">Jump</option>
+                    <option value="squat" selected>Squat</option>
+                    <option value="lunge">Lunge</option>
+                    <option value="deadlift">Deadlift</option>
+                    <option value="calf_raise">Calf Raise</option>
+                    <option value="box_jump">Box Jump</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-lbl">Trial No.</label>
+                  <select id="inp-trial" class="form-inp">
+                    <option value="1" selected>1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <label class="form-lbl">Number of Hurdles</label>
+                <div class="slider-row">
+                  <input id="inp-hurdles" type="range" min="1" max="30" value="10">
+                  <span class="slider-val" id="hurdles-val">10</span>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <label class="form-lbl">Attempt Time Limit</label>
+                <div class="slider-row">
+                  <input id="inp-timelimit" type="range" min="3" max="15" value="5">
+                  <span class="slider-val" id="timelimit-val">5 s</span>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <label class="form-lbl">Control Channels (select one or more muscles)</label>
+                <div class="channel-picker" id="channel-picker">
+                  <button type="button" class="ch-btn" data-ch="0" id="ch-btn-0">🤖 Auto (Highest RMS)</button>
+                  <button type="button" class="ch-btn active" data-ch="1" id="ch-btn-1">CH1 — Rectus Femoris</button>
+                  <button type="button" class="ch-btn" data-ch="2" id="ch-btn-2">CH2 — Biceps Femoris</button>
+                  <button type="button" class="ch-btn" data-ch="3" id="ch-btn-3">CH3 — Gastrocnemius</button>
+                  <button type="button" class="ch-btn" data-ch="4" id="ch-btn-4">CH4 — Spare</button>
+                </div>
+                <div class="ch-live-preview" id="ch-live-preview">Live RMS: — mV</div>
+              </div>
+
+              <div class="form-row" id="comb-mode-row" style="display: none;">
+                <label class="form-lbl">Multi-Muscle Control Mode</label>
+                <select id="inp-comb-mode" class="form-inp">
+                  <option value="avg" selected>Average RMS (Smooth combined effort)</option>
+                  <option value="max">Max RMS (Any muscle above threshold)</option>
+                  <option value="min">Min RMS (All muscles above threshold simultaneously)</option>
+                </select>
+              </div>
+            </div>
           </div>
 
-          <div class="form-row form-row-2">
-            <div>
-              <label class="form-lbl">Sex</label>
-              <select id="inp-sex" class="form-inp">
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-              </select>
+          <!-- Step 2: Calibration -->
+          <div class="step-card">
+            <div class="step-num">STEP 2</div>
+            <div class="step-title">Set Your Target Strength</div>
+            <div class="step-desc">Flex your target muscle(s) at your desired effort level. The system records this as your jump threshold.</div>
+
+            <div id="calib-result-badge" class="calib-badge hidden">
+              ✓ Target set: <span id="calib-result-mV">—</span>
             </div>
-            <div>
-              <label class="form-lbl">Age (years)</label>
-              <input id="inp-age" class="form-inp" type="number" min="10" max="100" value="25">
+
+            <div class="calib-live-wrap hidden" id="setup-live-wrap">
+              <div class="calib-live-bar-bg">
+                <div class="calib-live-bar-fg" id="setup-live-fg"></div>
+              </div>
+              <div class="calib-live-rms" id="setup-live-rms">0 mV</div>
             </div>
+
+            <button type="button" class="btn-secondary" id="calib-sample-btn">📡 Start Sample Flex (5 s)</button>
           </div>
 
-          <div class="form-row form-row-2">
-            <div>
-              <label class="form-lbl">Weight (kg)</label>
-              <input id="inp-weight" class="form-inp" type="number" min="20" max="300" step="0.5" value="70">
-            </div>
-            <div>
-              <label class="form-lbl">Height (cm)</label>
-              <input id="inp-height" class="form-inp" type="number" min="100" max="250" step="1" value="170">
-            </div>
-          </div>
+        </div>
 
-          <div class="form-row form-row-2">
-            <div>
-              <label class="form-lbl">Leg Exercise</label>
-              <select id="inp-exercise" class="form-inp">
-                <option value="jump">Jump</option>
-                <option value="squat" selected>Squat</option>
-                <option value="lunge">Lunge</option>
-                <option value="deadlift">Deadlift</option>
-                <option value="calf_raise">Calf Raise</option>
-                <option value="box_jump">Box Jump</option>
-              </select>
+        <!-- Right Column: Interactive Anatomy & Placement Guide -->
+        <div class="setup-col-right">
+          <div class="step-card guide-card">
+            <div class="step-num" style="border-color: var(--teal); color: var(--teal)">ELECTRODE GUIDE</div>
+            <div class="step-title">Anatomy &amp; Muscle Activation</div>
+            <div class="step-desc">Place electrodes as highlighted on the leg. Follow instructions below to contract target muscles.</div>
+            
+            <div class="anatomy-wrap">
+              <canvas id="anatomy-canvas" width="220" height="320"></canvas>
             </div>
-            <div>
-              <label class="form-lbl">Trial No.</label>
-              <select id="inp-trial" class="form-inp">
-                <option value="1" selected>1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-              </select>
+            
+            <div class="guide-box" id="guide-box">
+              Select a muscle channel to view instructions.
             </div>
-          </div>
-
-          <div class="form-row">
-            <label class="form-lbl">Number of Hurdles</label>
-            <div class="slider-row">
-              <input id="inp-hurdles" type="range" min="1" max="30" value="10">
-              <span class="slider-val" id="hurdles-val">10</span>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <label class="form-lbl">Attempt Time Limit</label>
-            <div class="slider-row">
-              <input id="inp-timelimit" type="range" min="3" max="15" value="5">
-              <span class="slider-val" id="timelimit-val">5 s</span>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <label class="form-lbl">Control Channels (select one or more muscles)</label>
-            <div class="channel-picker" id="channel-picker">
-              <button type="button" class="ch-btn" data-ch="0" id="ch-btn-0">🤖 Auto (Highest RMS)</button>
-              <button type="button" class="ch-btn active" data-ch="1" id="ch-btn-1">CH1 — Rectus Femoris</button>
-              <button type="button" class="ch-btn" data-ch="2" id="ch-btn-2">CH2 — Biceps Femoris</button>
-              <button type="button" class="ch-btn" data-ch="3" id="ch-btn-3">CH3 — Gastrocnemius</button>
-              <button type="button" class="ch-btn" data-ch="4" id="ch-btn-4">CH4 — Spare</button>
-            </div>
-            <div class="ch-live-preview" id="ch-live-preview">Live RMS: — mV</div>
-          </div>
-
-          <div class="form-row" id="comb-mode-row" style="display: none;">
-            <label class="form-lbl">Multi-Muscle Control Mode</label>
-            <select id="inp-comb-mode" class="form-inp">
-              <option value="avg" selected>Average RMS (Smooth combined effort)</option>
-              <option value="max">Max RMS (Any muscle above threshold)</option>
-              <option value="min">Min RMS (All muscles above threshold simultaneously)</option>
-            </select>
           </div>
         </div>
+
       </div>
 
-      <!-- Step 2: Calibration -->
-      <div class="step-card">
-        <div class="step-num">STEP 2</div>
-        <div class="step-title">Set Your Target Strength</div>
-        <div class="step-desc">Flex your forearm at your desired effort level. The system records this as your jump threshold.</div>
-
-        <div id="calib-result-badge" class="calib-badge hidden">
-          ✓ Target set: <span id="calib-result-mV">—</span>
-        </div>
-
-        <div class="calib-live-wrap hidden" id="setup-live-wrap">
-          <div class="calib-live-bar-bg">
-            <div class="calib-live-bar-fg" id="setup-live-fg"></div>
-          </div>
-          <div class="calib-live-rms" id="setup-live-rms">0 mV</div>
-        </div>
-
-        <button class="btn-secondary" id="calib-sample-btn">📡 Start Sample Flex (5 s)</button>
-      </div>
-
-      <button class="btn-primary" id="start-btn" disabled>Begin Protocol →</button>
+      <button type="button" class="btn-primary" id="start-btn" disabled style="margin-top:20px; width:100%;">Begin Protocol →</button>
     </div>
   </div>
 

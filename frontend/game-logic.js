@@ -45,6 +45,17 @@ function update(dt) {
 
 // ── Update: Approaching (run to hurdle) ───────────────
 function updateApproach(dt) {
+  // Check for early flex
+  if (EMG.rms >= SESSION.threshold) {
+    earlyFlexHeld += dt;
+    if (earlyFlexHeld >= 0.12) {
+      beginRestPhase(true);
+      return;
+    }
+  } else {
+    earlyFlexHeld = 0;
+  }
+
   GAME.approachT += dt;
   var t = Math.min(GAME.approachT / GAME.approachDur, 1);
   t = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; // Ease in-out
@@ -59,26 +70,55 @@ function updateApproach(dt) {
 // ── Update: Resting (relax forearm/leg muscle) ────────
 function updateResting(dt) {
   var relaxThreshold = Math.max(SESSION.baseline + 8, SESSION.threshold * 0.4, 15);
+  // Cap relax threshold at 75% of target flex threshold
+  relaxThreshold = Math.min(relaxThreshold, SESSION.threshold * 0.75);
   var currentRms = Math.round(EMG.rms);
   
   if (GAME.restTimer > 0) {
     GAME.restTimer -= dt;
     $('cd-big').textContent = Math.ceil(GAME.restTimer) + ' s';
-    $('cd-sub').textContent = '🧘 REST & RELAX YOUR MUSCLE';
-    $('cd-sub').style.color = '#ffb300';
+    if (restTooEarly) {
+      $('cd-sub').textContent = '⚠️ TOO EARLY! RELAX YOUR MUSCLE';
+      $('cd-sub').style.color = '#ff3860';
+    } else {
+      $('cd-sub').textContent = '🧘 REST & RELAX YOUR MUSCLE';
+      $('cd-sub').style.color = '#ffb300';
+    }
   } else {
     $('cd-big').textContent = currentRms + ' mV';
-    $('cd-sub').textContent = '🧘 RELAX YOUR MUSCLE (Target: <' + Math.round(relaxThreshold) + ' mV)';
-    $('cd-sub').style.color = '#ffb300';
+    if (restTooEarly) {
+      $('cd-sub').textContent = '⚠️ TOO EARLY! RELAX YOUR MUSCLE (Target: <' + Math.round(relaxThreshold) + ' mV)';
+      $('cd-sub').style.color = '#ff3860';
+    } else {
+      $('cd-sub').textContent = '🧘 RELAX YOUR MUSCLE (Target: <' + Math.round(relaxThreshold) + ' mV)';
+      $('cd-sub').style.color = '#ffb300';
+    }
 
+    // Must sustain relaxation for at least 200ms
     if (EMG.rms < relaxThreshold) {
-      beginReadyPhase();
+      GAME.relaxTimeHeld += dt;
+      if (GAME.relaxTimeHeld >= 0.20) {
+        beginReadyPhase();
+      }
+    } else {
+      GAME.relaxTimeHeld = 0;
     }
   }
 }
 
 // ── Update: Ready countdown phase (1s) ────────────────
 function updateReady(dt) {
+  // Check for early flex
+  if (EMG.rms >= SESSION.threshold) {
+    earlyFlexHeld += dt;
+    if (earlyFlexHeld >= 0.12) {
+      beginRestPhase(true);
+      return;
+    }
+  } else {
+    earlyFlexHeld = 0;
+  }
+
   GAME.readyTimer -= dt;
   $('cd-big').textContent = Math.max(0, Math.ceil(GAME.readyTimer));
 
@@ -192,6 +232,7 @@ function beginApproach(hurdleIndex) {
   GAME.approachStartFrac  = GAME.charFrac;
   GAME.approachTargetFrac = hurdleFrac(hurdleIndex) - 0.018;
   GAME.approachTargetFrac = Math.max(GAME.charFrac, GAME.approachTargetFrac);
+  earlyFlexHeld = 0;
 
   var dist = Math.abs(GAME.approachTargetFrac - GAME.charFrac);
   GAME.approachDur = Math.max(0.6, dist * (SESSION.numHurdles + 1) * 1.4);
@@ -267,13 +308,16 @@ function onLanded() {
     GAME.phase = 'complete';
     setTimeout(completeSession, 900);
   } else {
-    beginRestPhase();
+    beginRestPhase(false);
   }
 }
 
-function beginRestPhase() {
+function beginRestPhase(tooEarly) {
   GAME.phase = 'resting';
   GAME.restTimer = 2.0; // Guaranteed minimum rest duration (2s)
+  GAME.relaxTimeHeld = 0; // Reset relaxation hold timer
+  earlyFlexHeld = 0;      // Reset early flex timer
+  restTooEarly = !!tooEarly; // Save warning state
   showOverlay('cd-overlay');
   
   if (restInterval) {
@@ -282,16 +326,27 @@ function beginRestPhase() {
   }
   
   $('cd-big').textContent = '2 s';
-  $('cd-sub').textContent = '🧘 REST & RELAX YOUR MUSCLE';
-  $('cd-sub').style.color = '#ffb300';
+  if (tooEarly) {
+    $('cd-sub').textContent = '⚠️ TOO EARLY! RELAX YOUR MUSCLE';
+    $('cd-sub').style.color = '#ff3860';
+  } else {
+    $('cd-sub').textContent = '🧘 REST & RELAX YOUR MUSCLE';
+    $('cd-sub').style.color = '#ffb300';
+  }
 }
 
 function beginReadyPhase() {
   GAME.phase = 'ready';
   GAME.readyTimer = 1.0; // Ready countdown timer
+  earlyFlexHeld = 0;      // Reset early flex timer
+  restTooEarly = false;   // Reset warning state
   
   $('cd-big').textContent = '1';
-  $('cd-sub').textContent = 'GET READY FOR NEXT HURDLE';
+  if (GAME.currentHurdle === 0) {
+    $('cd-sub').textContent = 'GET READY FOR HURDLE 1';
+  } else {
+    $('cd-sub').textContent = 'GET READY FOR NEXT HURDLE';
+  }
   $('cd-sub').style.color = '#00e5c8';
 }
 
@@ -310,6 +365,9 @@ function resetToSetup() {
     EmgEngine.clearAllData();
   }
   
+  GAME.relaxTimeHeld = 0;
+  earlyFlexHeld = 0;
+  restTooEarly = false;
   hideAllOverlays();
   SESSION.calibrated = false;
   $('start-btn').disabled = true;
@@ -497,36 +555,13 @@ function startProtocol() {
   }
 
   hideOverlay('setup-overlay');
-  beginCountdown();
-}
-
-function beginCountdown() {
-  if (restInterval) clearInterval(restInterval);
-  showOverlay('cd-overlay');
-  $('cd-big').textContent = '1';
-  $('cd-sub').textContent = 'GET READY';
-  $('cd-sub').style.color = '';
+  
+  // Start session recording and start directly with the rest phase
+  sessionStartTime = Date.now();
+  startGameEMGRecording();
+  GAME.charFrac = 0;
+  beginRestPhase(false);
   startLoop();
-
-  var n = 1;
-  restInterval = setInterval(function() {
-    n--;
-    if (n > 0) {
-      $('cd-big').textContent = n;
-    } else {
-      $('cd-big').textContent = 'GO!';
-      $('cd-sub').textContent = '💪 FLEX TO JUMP!';
-      clearInterval(restInterval);
-      restInterval = null;
-      setTimeout(function() {
-        hideOverlay('cd-overlay');
-        sessionStartTime = Date.now();
-        startGameEMGRecording();
-        GAME.charFrac = 0;
-        beginApproach(0);
-      }, 800);
-    }
-  }, 950);
 }
 
 function completeSession() {

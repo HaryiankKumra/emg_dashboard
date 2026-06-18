@@ -15,6 +15,8 @@ var calibInterval = null;
 var restInterval = null;
 var calibElapsed = 0;
 var flexThresholdHeld = 0;
+var earlyFlexHeld = 0;
+var restTooEarly = false;
 var flexTimer = 0;
 var sessionStartTime = 0;
 var particles = [];
@@ -82,6 +84,7 @@ var GAME = {
   hitTimer: 0,
   readyTimer: 0,             // Dedicated ready state timer (1.0s countdown)
   restTimer: 0,              // Guaranteed minimum rest state timer (2.0s countdown)
+  relaxTimeHeld: 0,          // Time (seconds) the muscle has been continuously relaxed
 };
 
 // ── Canvas ────────────────────────────────────────────

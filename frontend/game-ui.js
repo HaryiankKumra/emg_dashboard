@@ -27,7 +27,7 @@ function initSetupForm() {
   }
 
   // Channel buttons
-  var chBtns = document.querySelectorAll('.ch-btn');
+  var chBtns = document.querySelectorAll('.channel-picker .ch-btn');
   chBtns.forEach(function(btn) {
     // Skip zoom button
     if (btn.id === 'anatomy-zoom-btn') return;
@@ -211,6 +211,7 @@ window.addEventListener('keydown', function(e) {
 initSetupForm();
 if (typeof EmgEngine !== 'undefined') EmgEngine.startBroadcast();
 connectEMG();
+updateCachedDimensions();
 
 // Run static canvas loop
 staticBg();

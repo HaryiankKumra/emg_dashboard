@@ -89,6 +89,11 @@ var canvas = document.getElementById('game-canvas');
 var ctx = canvas.getContext('2d');
 var W = 0, H = 0;
 
+// Cached layout dimensions to prevent layout-thrashing DOM reads
+var anatomyWidth = 220;
+var anatomyHeight = 320;
+var waveWidth = 0;
+
 // ── Layout constants ──────────────────────────────────
 var TRACK_Y_FRAC = 0.70;     // track Y as fraction of canvas H
 var TRACK_L_FRAC = 0.06;     // track left margin fraction

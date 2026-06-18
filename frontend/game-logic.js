@@ -315,6 +315,7 @@ function resetToSetup() {
   $('start-btn').disabled = true;
   $('calib-result-badge').classList.add('hidden');
   showOverlay('setup-overlay');
+  updateCachedDimensions();
 }
 
 // ── Overlay management helper ────────────────────────
@@ -323,6 +324,7 @@ function showOverlay(id) {
     var el = $(oid);
     if (el) el.classList.toggle('hidden', oid !== id);
   });
+  updateCachedDimensions();
 }
 
 function hideOverlay(id) {
@@ -340,6 +342,7 @@ function hideAllOverlays() {
 // ── Flex Panel UI update ─────────────────────────────
 function showFlexOverlay() {
   $('flex-overlay').classList.remove('hidden');
+  updateCachedDimensions();
 
   $('flex-hurdle-id').textContent      = 'HURDLE ' + (GAME.currentHurdle + 1) + ' / ' + SESSION.numHurdles;
   $('flex-attempt-badge').textContent  = 'ATTEMPT ' + GAME.totalAttemptsThisHurdle;

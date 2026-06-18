@@ -25,9 +25,23 @@ function resize() {
   }
   ctx.resetTransform();
   ctx.scale(dpr, dpr);
+
+  updateCachedDimensions();
 }
 window.addEventListener('resize', resize);
 resize();
+
+function updateCachedDimensions() {
+  var ac = document.getElementById('anatomy-canvas');
+  if (ac && ac.offsetWidth > 0) {
+    anatomyWidth = ac.offsetWidth;
+    anatomyHeight = ac.offsetHeight;
+  }
+  var wc = document.getElementById('wave-canvas');
+  if (wc && wc.offsetWidth > 0) {
+    waveWidth = wc.offsetWidth;
+  }
+}
 
 // ── Main game screen render loop ─────────────────────
 function render(dt) {
@@ -426,7 +440,7 @@ function updateWaveform() {
 
   var wc = document.getElementById('wave-canvas');
   if (!wc) return;
-  var wW = wc.offsetWidth;
+  var wW = waveWidth;
   var wH = 60;
   if (wW === 0 || wH === 0) return; // Safeguard
 
@@ -519,8 +533,8 @@ function updateWaveform() {
 function updateAnatomyCanvas() {
   var canvas = $('anatomy-canvas');
   if (!canvas) return;
-  var w = canvas.offsetWidth;
-  var h = canvas.offsetHeight;
+  var w = anatomyWidth;
+  var h = anatomyHeight;
   if (w === 0 || h === 0) return; // Safeguard
 
   var actx = canvas.getContext('2d');

@@ -81,13 +81,17 @@
                   <select id="inp-limb" class="form-inp">
                     <option value="leg" selected>🦵 Leg Muscles</option>
                     <option value="arm">💪 Arm Muscles</option>
+                    <option value="weightlifting">🏋️ Weightlifting</option>
                   </select>
                 </div>
                 <div>
                   <label class="form-lbl">Exercise</label>
-                  <select id="inp-exercise" class="form-inp">
-                    <!-- Dynamic -->
-                  </select>
+                  <div style="display: flex; gap: 6px;">
+                    <select id="inp-exercise" class="form-inp" style="flex: 1; min-width: 0;">
+                      <!-- Dynamic -->
+                    </select>
+                    <button type="button" class="ch-btn" id="add-exercise-btn" style="padding: 0 10px; margin: 0; height: 38px; display: flex; align-items: center; justify-content: center;" title="Add Custom Exercise">➕</button>
+                  </div>
                 </div>
                 <div>
                   <label class="form-lbl">Trial No.</label>

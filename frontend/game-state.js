@@ -81,6 +81,7 @@ var GAME = {
   // Hit/Ready timers
   hitTimer: 0,
   readyTimer: 0,             // Dedicated ready state timer (1.0s countdown)
+  restTimer: 0,              // Guaranteed minimum rest state timer (2.0s countdown)
 };
 
 // ── Canvas ────────────────────────────────────────────
@@ -114,6 +115,15 @@ var LIMB_EXERCISES = {
     { value: 'wrist_curl', label: 'Wrist Curl' },
     { value: 'pushup', label: 'Push-up' },
     { value: 'shoulder_press', label: 'Shoulder Press' }
+  ],
+  weightlifting: [
+    { value: 'bicep_curl', label: 'Bicep Curl', selected: true },
+    { value: 'wrist_curl', label: 'Wrist Curl' },
+    { value: 'reverse_wrist_curl', label: 'Reverse Wrist Curl' },
+    { value: 'bench_press', label: 'Bench Press' },
+    { value: 'deadlift', label: 'Deadlift' },
+    { value: 'clean_jerk', label: 'Clean & Jerk' },
+    { value: 'snatch', label: 'Snatch' }
   ]
 };
 
@@ -129,6 +139,12 @@ var CH_LABELS = {
     2: 'CH2 — Triceps Brachii',
     3: 'CH3 — Brachioradialis',
     4: 'CH4 — Flexor Carpi'
+  },
+  weightlifting: {
+    1: 'CH1 — Biceps Brachii',
+    2: 'CH2 — Triceps Brachii',
+    3: 'CH3 — Wrist Extensors',
+    4: 'CH4 — Wrist Flexors'
   }
 };
 

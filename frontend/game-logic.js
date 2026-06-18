@@ -61,12 +61,19 @@ function updateResting(dt) {
   var relaxThreshold = Math.max(SESSION.baseline + 8, SESSION.threshold * 0.4, 15);
   var currentRms = Math.round(EMG.rms);
   
-  $('cd-big').textContent = currentRms + ' mV';
-  $('cd-sub').textContent = '🧘 RELAX YOUR MUSCLE (Target: <' + Math.round(relaxThreshold) + ' mV)';
-  $('cd-sub').style.color = '#ffb300';
+  if (GAME.restTimer > 0) {
+    GAME.restTimer -= dt;
+    $('cd-big').textContent = Math.ceil(GAME.restTimer) + ' s';
+    $('cd-sub').textContent = '🧘 REST & RELAX YOUR MUSCLE';
+    $('cd-sub').style.color = '#ffb300';
+  } else {
+    $('cd-big').textContent = currentRms + ' mV';
+    $('cd-sub').textContent = '🧘 RELAX YOUR MUSCLE (Target: <' + Math.round(relaxThreshold) + ' mV)';
+    $('cd-sub').style.color = '#ffb300';
 
-  if (EMG.rms < relaxThreshold) {
-    beginReadyPhase();
+    if (EMG.rms < relaxThreshold) {
+      beginReadyPhase();
+    }
   }
 }
 
@@ -266,6 +273,7 @@ function onLanded() {
 
 function beginRestPhase() {
   GAME.phase = 'resting';
+  GAME.restTimer = 2.0; // Guaranteed minimum rest duration (2s)
   showOverlay('cd-overlay');
   
   if (restInterval) {
@@ -273,8 +281,8 @@ function beginRestPhase() {
     restInterval = null;
   }
   
-  $('cd-big').textContent = 'RELAX';
-  $('cd-sub').textContent = 'REST & RELAX YOUR MUSCLE';
+  $('cd-big').textContent = '2 s';
+  $('cd-sub').textContent = '🧘 REST & RELAX YOUR MUSCLE';
   $('cd-sub').style.color = '#ffb300';
 }
 

@@ -534,7 +534,7 @@ function updateAnatomyCanvas() {
   actx.resetTransform();
   actx.scale(dpr, dpr);
 
-  var isArm = (SESSION.targetLimb === 'arm');
+  var isArm = (SESSION.targetLimb === 'arm' || SESSION.targetLimb === 'weightlifting');
 
   // Zoom logic
   var zoom = SESSION.anatomyZoom || 1.0;

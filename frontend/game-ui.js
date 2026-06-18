@@ -101,6 +101,42 @@ function initSetupForm() {
     updateChannelLabels(limbSelect.value);
   }
 
+  // Add Custom Exercise button listener
+  var addExBtn = $('add-exercise-btn');
+  if (addExBtn) {
+    addExBtn.addEventListener('click', function() {
+      var customName = prompt("Enter name of custom exercise:");
+      if (customName) {
+        customName = customName.trim();
+        if (customName.length > 0) {
+          var value = customName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+          if (!LIMB_EXERCISES[SESSION.targetLimb]) {
+            LIMB_EXERCISES[SESSION.targetLimb] = [];
+          }
+          // Mark others as not selected
+          LIMB_EXERCISES[SESSION.targetLimb].forEach(function(o) { o.selected = false; });
+          
+          // Add new custom option
+          LIMB_EXERCISES[SESSION.targetLimb].push({
+            value: value,
+            label: customName,
+            selected: true
+          });
+          
+          // Re-populate and select it
+          updateExerciseOptions(SESSION.targetLimb);
+          
+          // Force select tag to match value
+          var select = $('inp-exercise');
+          if (select) select.value = value;
+          
+          // Update exercise in session
+          SESSION.exercise = value;
+        }
+      }
+    });
+  }
+
   // Anatomy Zoom Button
   var zoomBtn = $('anatomy-zoom-btn');
   if (zoomBtn) {

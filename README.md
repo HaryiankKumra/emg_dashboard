@@ -17,7 +17,7 @@ cd frontend && python3 -m http.server 8080
 ```
 
 ## Deploy
-
+hjh
 Connected to Vercel — pushes to `main` auto-deploy when GitHub is linked.
 
 ```bash

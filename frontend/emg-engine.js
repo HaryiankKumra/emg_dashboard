@@ -231,6 +231,18 @@ class ChannelData {
     this._hwRate = hz;
   }
 
+  clear() {
+    this.buffer    = [];
+    this.rms            = 0;
+    this.mean           = 0;
+    this.peak           = 0;
+    this.peak_to_peak   = 0;
+    this.sample_rate    = 0;
+    this._hwRate        = 0;
+    this._sampleCount   = 0;
+    this._rateWindowStart = performance.now();
+  }
+
   ingest(samples) {
     for (const s of samples) {
       this.buffer.push(s);
@@ -694,6 +706,17 @@ const EmgEngine = {
 
   setStats(stats) {
     this._stats = { ...stats };
+  },
+
+  clearAllData() {
+    for (const chId of [1, 2, 3, 4]) {
+      this._channels[chId].clear();
+    }
+    this.resetFilters();
+    this.recorder.reset();
+    this._stats = { rx_packets: 0, rx_errors: 0, bytes_received: 0 };
+    this._lastBroadcast = 0;
+    this._emit();
   },
 
   setConnected(connected) {

@@ -578,6 +578,11 @@ input[type=range]::-webkit-slider-thumb {
   margin-bottom: 15px;
   position: relative;
 }
+#anatomy-canvas {
+  display: block;
+  width: 220px;
+  height: 320px;
+}
 
 .guide-box {
   background: rgba(0, 229, 200, 0.04);

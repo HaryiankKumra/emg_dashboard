@@ -534,6 +534,68 @@ class Recorder {
     };
   }
 
+  /**
+   * Compute data alignment statistics across all active channels.
+   * Returns:
+   *   - totalFrames:       total unique timestamp slots across all channels
+   *   - alignedFrames:     frames where ALL active channels have data
+   *   - alignedPct:        % of frames that are fully aligned
+   *   - perChannel:        per-channel sample count and % of total frames covered
+   *   - active:            list of active channel IDs
+   *   - durationS:         estimated session duration in seconds
+   */
+  getAlignmentStats() {
+    const active = [1, 2, 3, 4].filter(c => this._chSamples[c].length > 0);
+    if (active.length === 0) {
+      return { active: [], totalFrames: 0, alignedFrames: 0, alignedPct: 0, perChannel: {}, durationS: 0 };
+    }
+
+    // Build Set<tsUs> per channel
+    const tsSets = {};
+    for (const c of active) {
+      tsSets[c] = new Set(this._chSamples[c].map(s => s.tsUs));
+    }
+
+    // Union of all timestamps = total possible frames
+    const unionTs = new Set();
+    for (const c of active) for (const ts of tsSets[c]) unionTs.add(ts);
+    const totalFrames = unionTs.size;
+
+    if (totalFrames === 0) {
+      return { active, totalFrames: 0, alignedFrames: 0, alignedPct: 0, perChannel: {}, durationS: 0 };
+    }
+
+    // Count frames where ALL active channels have data (intersection)
+    let alignedFrames = 0;
+    for (const ts of unionTs) {
+      if (active.every(c => tsSets[c].has(ts))) alignedFrames++;
+    }
+
+    const alignedPct = Math.round((alignedFrames / totalFrames) * 1000) / 10;
+
+    // Per-channel: how many of the total frames does this channel cover?
+    const perChannel = {};
+    for (const c of active) {
+      const count = tsSets[c].size;
+      perChannel[c] = {
+        samples: count,
+        coveragePct: Math.round((count / totalFrames) * 1000) / 10,
+      };
+    }
+
+    // Estimate session duration from timestamp span
+    let minTs = Infinity, maxTs = -Infinity;
+    for (const c of active) {
+      for (const ts of tsSets[c]) {
+        if (ts < minTs) minTs = ts;
+        if (ts > maxTs) maxTs = ts;
+      }
+    }
+    const durationS = (maxTs - minTs) > 0 ? Math.round((maxTs - minTs) / 1e6 * 10) / 10 : 0;
+
+    return { active, totalFrames, alignedFrames, alignedPct, perChannel, durationS };
+  }
+
   _prepareChannelValues(active, applyFilter) {
     const chValues = {};
     for (const c of active) {

@@ -421,6 +421,16 @@ select:focus, input:focus {
   box-shadow: 0 0 12px rgba(0,212,232,0.15);
 }
 
+/* Alignment analysis button */
+.btn-align {
+  background: linear-gradient(135deg, #00d4e8, #0096a8);
+  color: #0a0d14;
+  box-shadow: 0 4px 14px rgba(0,212,232,0.25);
+}
+.btn-align:not(:disabled):hover {
+  box-shadow: 0 6px 20px rgba(0,212,232,0.45);
+}
+
 .btn-icon { font-size: 15px; }
 
 .divider-v {

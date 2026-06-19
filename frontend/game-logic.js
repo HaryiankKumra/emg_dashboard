@@ -70,12 +70,14 @@ function updateApproach(dt) {
 // ── Update: Resting (relax forearm/leg muscle) ────────
 function updateResting(dt) {
   var relaxThreshold = Math.max(SESSION.baseline + 8, SESSION.threshold * 0.4, 15);
-  // Cap relax threshold at 75% of target flex threshold
+  // Cap relax threshold at 75% of target flex threshold so relaxed < jump trigger is always true
   relaxThreshold = Math.min(relaxThreshold, SESSION.threshold * 0.75);
   var currentRms = Math.round(EMG.rms);
   
   if (GAME.restTimer > 0) {
+    // Mandatory rest countdown — player cannot do anything yet
     GAME.restTimer -= dt;
+    GAME.relaxTimeHeld = 0; // Cannot start counting relaxation until mandatory rest is done
     $('cd-big').textContent = Math.ceil(GAME.restTimer) + ' s';
     if (restTooEarly) {
       $('cd-sub').textContent = '⚠️ TOO EARLY! RELAX YOUR MUSCLE';
@@ -87,21 +89,21 @@ function updateResting(dt) {
   } else {
     $('cd-big').textContent = currentRms + ' mV';
     if (restTooEarly) {
-      $('cd-sub').textContent = '⚠️ TOO EARLY! RELAX YOUR MUSCLE (Target: <' + Math.round(relaxThreshold) + ' mV)';
+      $('cd-sub').textContent = '⚠️ RELAX YOUR MUSCLE (Target: <' + Math.round(relaxThreshold) + ' mV)';
       $('cd-sub').style.color = '#ff3860';
     } else {
       $('cd-sub').textContent = '🧘 RELAX YOUR MUSCLE (Target: <' + Math.round(relaxThreshold) + ' mV)';
       $('cd-sub').style.color = '#ffb300';
     }
 
-    // Must sustain relaxation for at least 200ms
+    // Must sustain relaxation for at least 200ms continuously
     if (EMG.rms < relaxThreshold) {
       GAME.relaxTimeHeld += dt;
       if (GAME.relaxTimeHeld >= 0.20) {
         beginReadyPhase();
       }
     } else {
-      GAME.relaxTimeHeld = 0;
+      GAME.relaxTimeHeld = 0; // Any spike resets the relaxation hold
     }
   }
 }
@@ -215,13 +217,15 @@ function updateJump(dt) {
   }
 }
 
-// ── Update: Hit / Crash ───────────────────────────────
+// ── Update: Hit / Crash ───────────────────────
 function updateHit(dt) {
   GAME.hitTimer -= dt;
   if (GAME.hitTimer <= 0) {
+    // After a failed attempt, put the player back in the rest phase
+    // to ensure they relax before trying again (prevents auto-passing)
     var prevFrac = hurdleFrac(GAME.currentHurdle) - 0.15;
     GAME.charFrac = Math.max(0, prevFrac);
-    beginApproach(GAME.currentHurdle);
+    beginRestPhase(false);
   }
 }
 
@@ -314,10 +318,10 @@ function onLanded() {
 
 function beginRestPhase(tooEarly) {
   GAME.phase = 'resting';
-  GAME.restTimer = 2.0; // Guaranteed minimum rest duration (2s)
-  GAME.relaxTimeHeld = 0; // Reset relaxation hold timer
-  earlyFlexHeld = 0;      // Reset early flex timer
-  restTooEarly = !!tooEarly; // Save warning state
+  GAME.restTimer = 2.0;    // Guaranteed minimum rest (2s)
+  GAME.relaxTimeHeld = 0;  // Always reset on rest entry
+  earlyFlexHeld = 0;       // Reset early flex timer
+  restTooEarly = !!tooEarly;
   showOverlay('cd-overlay');
   
   if (restInterval) {
@@ -503,6 +507,11 @@ function skipCalib() {
     clearInterval(calibInterval);
     calibInterval = null;
   }
+  // Stop any animation loop started by startSampleFlex
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
   calibPhase = 'idle';
   SESSION.threshold  = 30;
   SESSION.baseline   = 4;
@@ -582,7 +591,9 @@ function buildResults() {
     var s = h.attempts.find(function(a) { return a.outcome === 'success'; });
     return s ? s.peakEMG_mV : 0;
   });
-  var avgPeak = peaks.reduce(function(s, v) { return s + v; }, 0) / peaks.length;
+  var avgPeak = peaks.length > 0
+    ? peaks.reduce(function(s, v) { return s + v; }, 0) / peaks.length
+    : 0;
 
   $('results-sid').textContent = 'SESSION · ' + SESSION.sessionId;
   $('results-summary').innerHTML =

@@ -42,9 +42,12 @@ const dom = {
   recLabelDisplay: $('rec-label-display'),
   recStartBtn: $('rec-start-btn'),
   recStopBtn: $('rec-stop-btn'),
-  downloadBtn: $('download-btn'),
-  downloadRawBtn: $('download-raw-btn'),
+  downloadBtn:     $('download-btn'),
+  downloadRawBtn:  $('download-raw-btn'),
   downloadLongBtn: $('download-long-btn'),
+  alignmentBtn:    $('alignment-btn'),
+  alignModal:      $('align-modal'),
+  alignModalBody:  $('align-modal-body'),
   connStatus: $('conn-status'),
   statusDot: $('status-dot'),
   statusText: $('status-text'),
@@ -324,6 +327,7 @@ function startRecording() {
   dom.downloadBtn.disabled = true;
   dom.downloadRawBtn.disabled = true;
   dom.downloadLongBtn.disabled = true;
+  dom.alignmentBtn.disabled = true;
 }
 
 function stopRecording() {
@@ -347,6 +351,7 @@ function stopRecording() {
   dom.downloadBtn.disabled = !state.hasData;
   dom.downloadRawBtn.disabled = !state.hasData;
   dom.downloadLongBtn.disabled = !state.hasData;
+  dom.alignmentBtn.disabled = !state.hasData;
 }
 
 function downloadCSV(filtered = true) {
@@ -408,6 +413,83 @@ function updateClock() {
   dom.footerTime.textContent = new Date().toLocaleString() + (tz ? ` (${tz})` : '');
 }
 
+function showAlignmentModal() {
+  const stats = EmgEngine.recorder.getAlignmentStats();
+  const body = dom.alignModalBody;
+  if (!body) return;
+
+  if (!stats || !stats.active || !stats.active.length) {
+    body.innerHTML = `<div style="text-align:center;padding:20px;color:#6b7590;">No recorded data to analyze.</div>`;
+    dom.alignModal.style.display = 'flex';
+    return;
+  }
+
+  const activeChannelsStr = stats.active.map(c => `CH${c}`).join(', ');
+  let qualityColor = '#ff4d4d'; // default red
+  let verdict = 'Poor / Bad Sync';
+  if (stats.alignedPct >= 95) {
+    qualityColor = '#00e5a0'; // green
+    verdict = 'Excellent Sync (Stable)';
+  } else if (stats.alignedPct >= 80) {
+    qualityColor = '#ffb84d'; // orange/yellow
+    verdict = 'Good Sync (Acceptable)';
+  }
+
+  let channelsHtml = '';
+  for (const c of stats.active) {
+    const chStats = stats.perChannel[c] || { count: 0, pct: 0 };
+    channelsHtml += `
+      <div style="margin-top:12px;">
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:4px;color:#a0aec0;">
+          <span>Channel ${c} (muscle ${c})</span>
+          <span style="margin-left:auto;">${chStats.count} samples (${chStats.pct}%)</span>
+        </div>
+        <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">
+          <div style="height:100%;width:${chStats.pct}%;background:${CH_COLORS[c]?.line || '#4d9fff'};border-radius:3px;"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  body.innerHTML = `
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:2.8rem;font-weight:700;color:${qualityColor};line-height:1.2;">
+        ${stats.alignedPct}%
+      </div>
+      <div style="font-size:0.95rem;font-weight:600;color:${qualityColor};margin-top:4px;text-transform:uppercase;letter-spacing:1px;">
+        ${verdict}
+      </div>
+      <div style="font-size:0.8rem;color:#6b7590;margin-top:2px;">
+        of total duration is fully time-aligned
+      </div>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);border-radius:8px;padding:12px;font-size:0.85rem;line-height:1.6;color:#a0aec0;margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;margin-top:2px;">
+        <span>Active Channels:</span>
+        <strong style="color:#e8ecf4;">${activeChannelsStr}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px;">
+        <span>Total Time Frames:</span>
+        <strong style="color:#e8ecf4;">${stats.totalFrames}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px;">
+        <span>Aligned Time Frames:</span>
+        <strong style="color:#e8ecf4;">${stats.alignedFrames}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px;">
+        <span>Session Duration:</span>
+        <strong style="color:#e8ecf4;">${stats.durationS.toFixed(1)}s</strong>
+      </div>
+    </div>
+
+    <div style="font-size:0.9rem;font-weight:600;color:#e8ecf4;margin-bottom:8px;">Channel Coverage Details:</div>
+    ${channelsHtml}
+  `;
+
+  dom.alignModal.style.display = 'flex';
+}
+
 function showCompatBanner() {
   const msg = SerialWeb.supportMessage();
   if (msg && dom.compatBanner) {
@@ -429,6 +511,15 @@ dom.recStopBtn.addEventListener('click', stopRecording);
 dom.downloadBtn.addEventListener('click', () => downloadCSV(true));
 dom.downloadRawBtn.addEventListener('click', () => downloadCSV(false));
 dom.downloadLongBtn.addEventListener('click', downloadLongCSV);
+dom.alignmentBtn.addEventListener('click', showAlignmentModal);
+$('align-modal-close').addEventListener('click', () => {
+  dom.alignModal.style.display = 'none';
+});
+window.addEventListener('click', (e) => {
+  if (e.target === dom.alignModal) {
+    dom.alignModal.style.display = 'none';
+  }
+});
 
 window.addEventListener('emg-update', onEmgUpdate);
 

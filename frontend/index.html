@@ -195,10 +195,6 @@
           title="One row per sample — best for IEEE analysis">
           <span class="btn-icon">↓</span> Long CSV
         </button>
-        <button id="alignment-btn" class="btn btn-align" disabled aria-label="Show data alignment analysis"
-          title="Show how much of the recorded data is time-aligned across channels">
-          <span class="btn-icon">📊</span> Alignment %
-        </button>
       </div>
 
     </section>
@@ -439,22 +435,6 @@
   <script src="emg-engine.js"></script>
   <script src="serial-web.js"></script>
   <script src="script.js"></script>
-  <!-- ── Alignment Analysis Modal ── -->
-  <div id="align-modal"
-    style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;"
-    role="dialog" aria-modal="true" aria-labelledby="align-modal-title">
-    <div
-      style="background:#1a1d2e;border:1px solid rgba(255,255,255,0.12);border-radius:16px;padding:32px 36px;min-width:380px;max-width:520px;width:90%;box-shadow:0 24px 80px rgba(0,0,0,0.6);">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-        <h2 id="align-modal-title" style="margin:0;font-size:1.2rem;font-weight:700;color:#e8ecf4;">📊 Data Alignment
-          Analysis</h2>
-        <button id="align-modal-close"
-          style="background:none;border:none;color:#6b7590;font-size:1.4rem;cursor:pointer;line-height:1;"
-          aria-label="Close">&times;</button>
-      </div>
-      <div id="align-modal-body"></div>
-    </div>
-  </div>
 
 </body>
 

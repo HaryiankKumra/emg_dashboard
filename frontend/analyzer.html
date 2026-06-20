@@ -538,7 +538,86 @@
         <p style="margin-top:6px;max-width:340px;">Select or drop a 2–5 MB EMG CSV recording file to inspect its timestamp alignment metrics.</p>
       </div>
 
+      <!-- ── Column Mapping Section ── -->
+      <div id="mapping-section" style="display:none; flex-direction:column; gap:20px; border-bottom:1px solid var(--border); padding-bottom:24px; margin-bottom:24px;">
+        <h3 style="font-size:1.1rem;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;">
+          🗺️ Column Mapping Wizard
+        </h3>
+        <p style="font-size:0.85rem;color:var(--text-muted);">
+          Map your CSV columns to sEMG Channels 1, 2, 3, 4 and Timestamp. If a channel was not active, select "Skip".
+        </p>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:16px;">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;">CSV Layout Mode</label>
+            <select id="map-mode" style="padding:8px 12px;background:#0a0f26;border:1px solid var(--border);border-radius:6px;color:#fff;font-family:inherit;font-size:0.85rem;cursor:pointer;">
+              <option value="wide" selected>Wide (Multichannel per Row)</option>
+              <option value="long">Long (Stacked Rows)</option>
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;">Timestamp / Time Column</label>
+            <select id="map-timestamp" style="padding:8px 12px;background:#0a0f26;border:1px solid var(--border);border-radius:6px;color:#fff;font-family:inherit;font-size:0.85rem;cursor:pointer;"></select>
+          </div>
+        </div>
+
+        <!-- Wide Layout Selects -->
+        <div id="mapping-wide-fields" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:16px;">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;">Channel 1 (muscle1)</label>
+            <select id="map-ch1" style="padding:8px 12px;background:#0a0f26;border:1px solid var(--border);border-radius:6px;color:#fff;font-family:inherit;font-size:0.85rem;cursor:pointer;"></select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;">Channel 2 (muscle2)</label>
+            <select id="map-ch2" style="padding:8px 12px;background:#0a0f26;border:1px solid var(--border);border-radius:6px;color:#fff;font-family:inherit;font-size:0.85rem;cursor:pointer;"></select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;">Channel 3 (muscle3)</label>
+            <select id="map-ch3" style="padding:8px 12px;background:#0a0f26;border:1px solid var(--border);border-radius:6px;color:#fff;font-family:inherit;font-size:0.85rem;cursor:pointer;"></select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;">Channel 4 (muscle4)</label>
+            <select id="map-ch4" style="padding:8px 12px;background:#0a0f26;border:1px solid var(--border);border-radius:6px;color:#fff;font-family:inherit;font-size:0.85rem;cursor:pointer;"></select>
+          </div>
+        </div>
+
+        <!-- Long Layout Selects -->
+        <div id="mapping-long-fields" style="display:none;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:16px;">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;">Channel ID Column</label>
+            <select id="map-long-ch" style="padding:8px 12px;background:#0a0f26;border:1px solid var(--border);border-radius:6px;color:#fff;font-family:inherit;font-size:0.85rem;cursor:pointer;"></select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;">EMG Value Column</label>
+            <select id="map-long-val" style="padding:8px 12px;background:#0a0f26;border:1px solid var(--border);border-radius:6px;color:#fff;font-family:inherit;font-size:0.85rem;cursor:pointer;"></select>
+          </div>
+        </div>
+
+        <!-- First 3 Rows Preview Table -->
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="font-size:0.8rem;font-weight:600;color:#cbd5e1;">📄 CSV Header Preview (First 3 Data Rows)</div>
+          <div class="table-wrap">
+            <table class="preview-table">
+              <thead id="map-preview-thead"></thead>
+              <tbody id="map-preview-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <button id="run-analysis-btn" style="padding:10px 24px;background:var(--accent-cyan);border:none;border-radius:20px;color:#02050e;font-weight:700;font-family:'Orbitron',sans-serif;font-size:0.85rem;cursor:pointer;transition:background 0.2s,box-shadow 0.2s;box-shadow:0 0 16px rgba(0,212,232,0.15);">
+            🚀 Analyze Alignment
+          </button>
+        </div>
+      </div>
+
       <div class="results-content" id="content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.03);padding-bottom:12px;">
+          <h3 style="font-size:1.1rem;font-weight:700;color:#fff;font-family:'Orbitron',sans-serif;letter-spacing:1px;">📊 ALIGNMENT RESULTS</h3>
+          <button id="toggle-mapping-btn" style="padding:6px 14px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:16px;color:var(--text);font-size:0.75rem;font-weight:600;cursor:pointer;transition:background 0.2s;">
+            ⚙️ Adjust Column Mapping
+          </button>
+        </div>
         
         <!-- Summary stats -->
         <div class="summary-grid">
@@ -618,6 +697,29 @@
     const content = document.getElementById('content');
     const toastEl = document.getElementById('toast-el');
 
+    // Mapping inputs & elements
+    const mappingSection = document.getElementById('mapping-section');
+    const mapMode = document.getElementById('map-mode');
+    const mapTimestamp = document.getElementById('map-timestamp');
+    const mapCh1 = document.getElementById('map-ch1');
+    const mapCh2 = document.getElementById('map-ch2');
+    const mapCh3 = document.getElementById('map-ch3');
+    const mapCh4 = document.getElementById('map-ch4');
+    const mapLongCh = document.getElementById('map-long-ch');
+    const mapLongVal = document.getElementById('map-long-val');
+    const mapWideFields = document.getElementById('mapping-wide-fields');
+    const mapLongFields = document.getElementById('mapping-long-fields');
+    const mapPreviewThead = document.getElementById('map-preview-thead');
+    const mapPreviewTbody = document.getElementById('map-preview-tbody');
+    const runAnalysisBtn = document.getElementById('run-analysis-btn');
+    const toggleMappingBtn = document.getElementById('toggle-mapping-btn');
+
+    // Parsed CSV State
+    let parsedHeaders = [];
+    let parsedRows = [];
+    let rawPreviewRows = [];
+    let parsedMetadata = {};
+
     // UI Updates helpers
     function toast(msg) {
       toastEl.textContent = msg;
@@ -675,9 +777,9 @@
         progState.textContent = 'Analyzing lines...';
         setTimeout(() => {
           try {
-            analyzeCSV(e.target.result);
+            parseCSVData(e.target.result);
             progWrap.style.display = 'none';
-            toast('✅ CSV analyzed successfully!');
+            toast('✅ CSV file loaded. Please map columns below.');
           } catch (err) {
             console.error(err);
             progWrap.style.display = 'none';
@@ -694,13 +796,17 @@
       reader.readAsText(file);
     }
 
-    function analyzeCSV(text) {
+    // 1. Initial Parse and setup of Mapping Wizard
+    function parseCSVData(text) {
       const lines = text.split('\n');
-      let headerLine = '';
-      const metadata = {};
-      const dataRows = [];
+      parsedHeaders = [];
+      parsedRows = [];
+      rawPreviewRows = [];
+      parsedMetadata = {};
 
-      // 1. Extract metadata and locate the header line
+      let headerLine = '';
+
+      // Extract metadata comments and locate header
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
@@ -710,7 +816,7 @@
           parts.forEach(p => {
             const kv = p.split('=');
             if (kv.length === 2) {
-              metadata[kv[0].trim()] = kv[1].trim();
+              parsedMetadata[kv[0].trim()] = kv[1].trim();
             }
           });
           continue;
@@ -721,24 +827,37 @@
           continue;
         }
 
-        dataRows.push(line);
+        parsedRows.push(line);
       }
 
       if (!headerLine) {
         throw new Error('No header line found');
       }
 
-      const headers = headerLine.split(',').map(h => h.trim());
-      const isLongFormat = headers.includes('channel') && (headers.includes('hw_timestamp_us') || headers.includes('timestamp'));
+      parsedHeaders = headerLine.split(',').map(h => h.trim());
 
-      // Render Metadata UI
-      renderMetadata(metadata);
-
-      if (isLongFormat) {
-        processLongFormat(headers, dataRows);
-      } else {
-        processWideFormat(headers, dataRows, headerLine);
+      // Read first 3 data rows for raw preview
+      const previewLimit = Math.min(parsedRows.length, 3);
+      for (let i = 0; i < previewLimit; i++) {
+        rawPreviewRows.push(parsedRows[i].split(',').map(c => c.trim()));
       }
+
+      // Render Metadata
+      renderMetadata(parsedMetadata);
+
+      // Populate Select elements
+      populateDropdowns();
+
+      // Render raw preview table inside mapping wizard
+      renderPreviewTable();
+
+      // Auto-detect format & guess mappings
+      autoDetectMappings();
+
+      // Show Mapping Wizard, Hide Placeholder and Results Content
+      placeholder.style.display = 'none';
+      mappingSection.style.display = 'flex';
+      content.style.display = 'none';
     }
 
     function renderMetadata(meta) {
@@ -762,47 +881,206 @@
       metaOut.innerHTML = html;
     }
 
-    function processWideFormat(headers, dataRows, headerLine) {
-      // Find muscle columns indices
-      const muscleColIndices = [];
-      const muscleColNames = [];
-      headers.forEach((h, idx) => {
-        const name = h.toLowerCase();
-        if (name !== 'datetime_local' && (name.includes('muscle') || name.includes('ch') || name.includes('mv') || name.includes('rf') || name.includes('bf') || name.includes('gas') || name.includes('ta'))) {
-          muscleColIndices.push(idx);
-          muscleColNames.push(h);
-        }
+    function populateDropdowns() {
+      // Clear previous options
+      const selects = [mapTimestamp, mapCh1, mapCh2, mapCh3, mapCh4, mapLongCh, mapLongVal];
+      selects.forEach(sel => {
+        sel.innerHTML = '';
       });
 
-      const colCounts = {}; // colIdx -> non-empty valid numbers
+      // Add options for each header column
+      parsedHeaders.forEach((header, idx) => {
+        selects.forEach(sel => {
+          const opt = document.createElement('option');
+          opt.value = idx;
+          opt.textContent = `${header} (Col ${idx + 1})`;
+          sel.appendChild(opt);
+        });
+      });
+
+      // For Channels 1-4, add a "Skip / Not Active" option at index 0
+      [mapCh1, mapCh2, mapCh3, mapCh4].forEach(sel => {
+        const skipOpt = document.createElement('option');
+        skipOpt.value = 'skip';
+        skipOpt.textContent = '⛔ Skip / Not Active';
+        sel.insertBefore(skipOpt, sel.firstChild);
+      });
+    }
+
+    function renderPreviewTable() {
+      // Headers
+      let theadHtml = '<tr>';
+      parsedHeaders.forEach(h => {
+        theadHtml += `<th>${h}</th>`;
+      });
+      theadHtml += '</tr>';
+      mapPreviewThead.innerHTML = theadHtml;
+
+      // Rows
+      let tbodyHtml = '';
+      rawPreviewRows.forEach(row => {
+        tbodyHtml += '<tr>';
+        parsedHeaders.forEach((_, idx) => {
+          tbodyHtml += `<td>${row[idx] ?? '—'}</td>`;
+        });
+        tbodyHtml += '</tr>';
+      });
+      if (!rawPreviewRows.length) {
+        tbodyHtml = `<tr><td colspan="${parsedHeaders.length}" style="text-align:center;color:var(--text-muted);">No rows to preview.</td></tr>`;
+      }
+      mapPreviewTbody.innerHTML = tbodyHtml;
+    }
+
+    function autoDetectMappings() {
+      const lowerHeaders = parsedHeaders.map(h => h.toLowerCase());
+
+      // 1. Guess layout mode
+      const hasChannelCol = lowerHeaders.some(h => h === 'channel' || h === 'ch');
+      const hasValueCol = lowerHeaders.some(h => h.includes('value') || h.includes('mv') || h.includes('emg'));
+
+      if (hasChannelCol && hasValueCol) {
+        mapMode.value = 'long';
+        mapWideFields.style.display = 'none';
+        mapLongFields.style.display = 'grid';
+
+        // Guess Long columns
+        const tsIdx = lowerHeaders.findIndex(h => h.includes('timestamp') || h.includes('ts') || h.includes('time'));
+        const chIdx = lowerHeaders.findIndex(h => h === 'channel' || h === 'ch');
+        const valIdx = lowerHeaders.findIndex(h => h.includes('value') || h.includes('mv') || h.includes('emg'));
+
+        if (tsIdx !== -1) mapTimestamp.value = tsIdx;
+        if (chIdx !== -1) mapLongCh.value = chIdx;
+        if (valIdx !== -1) mapLongVal.value = valIdx;
+      } else {
+        mapMode.value = 'wide';
+        mapWideFields.style.display = 'grid';
+        mapLongFields.style.display = 'none';
+
+        // Guess Wide Timestamp
+        const tsIdx = lowerHeaders.findIndex(h => h.includes('time') || h.includes('date') || h.includes('ts'));
+        if (tsIdx !== -1) mapTimestamp.value = tsIdx;
+
+        // Guess Channels 1-4
+        // Channel 1: "muscle1", "ch1", "v1", "ch_1", or Col Index 1
+        const ch1Idx = findHeaderGuess(lowerHeaders, ['muscle1', 'ch1', 'v1', 'ch_1', 'rms1', 'raw1']);
+        mapCh1.value = ch1Idx !== -1 ? ch1Idx : (parsedHeaders.length > 1 ? 1 : 'skip');
+
+        const ch2Idx = findHeaderGuess(lowerHeaders, ['muscle2', 'ch2', 'v2', 'ch_2', 'rms2', 'raw2']);
+        mapCh2.value = ch2Idx !== -1 ? ch2Idx : (parsedHeaders.length > 2 ? 2 : 'skip');
+
+        const ch3Idx = findHeaderGuess(lowerHeaders, ['muscle3', 'ch3', 'v3', 'ch_3', 'rms3', 'raw3']);
+        mapCh3.value = ch3Idx !== -1 ? ch3Idx : (parsedHeaders.length > 3 ? 3 : 'skip');
+
+        const ch4Idx = findHeaderGuess(lowerHeaders, ['muscle4', 'ch4', 'v4', 'ch_4', 'rms4', 'raw4']);
+        mapCh4.value = ch4Idx !== -1 ? ch4Idx : (parsedHeaders.length > 4 ? 4 : 'skip');
+      }
+    }
+
+    function findHeaderGuess(headers, keys) {
+      for (const key of keys) {
+        const idx = headers.findIndex(h => h.includes(key));
+        if (idx !== -1) return idx;
+      }
+      return -1;
+    }
+
+    // Toggle wide/long configuration inputs
+    mapMode.addEventListener('change', () => {
+      const mode = mapMode.value;
+      if (mode === 'wide') {
+        mapWideFields.style.display = 'grid';
+        mapLongFields.style.display = 'none';
+      } else {
+        mapWideFields.style.display = 'none';
+        mapLongFields.style.display = 'grid';
+      }
+    });
+
+    // Toggle mapping wizard visibility from results header
+    toggleMappingBtn.addEventListener('click', () => {
+      const isHidden = mappingSection.style.display === 'none';
+      mappingSection.style.display = isHidden ? 'flex' : 'none';
+      toggleMappingBtn.textContent = isHidden ? '🙈 Hide Column Mapping' : '⚙️ Adjust Column Mapping';
+    });
+
+    // Run Alignment Calculation
+    runAnalysisBtn.addEventListener('click', () => {
+      if (!parsedHeaders.length) {
+        toast('❌ No file loaded. Please upload a CSV first.');
+        return;
+      }
+
+      const mode = mapMode.value;
+      const tsIdx = parseInt(mapTimestamp.value, 10);
+
+      if (isNaN(tsIdx)) {
+        toast('❌ Please select a Timestamp / Time column.');
+        return;
+      }
+
+      try {
+        if (mode === 'wide') {
+          calculateWideAlignment(tsIdx);
+        } else {
+          calculateLongAlignment(tsIdx);
+        }
+        
+        // Hide Mapping Section and Show Results Dashboard
+        mappingSection.style.display = 'none';
+        toggleMappingBtn.textContent = '⚙️ Adjust Column Mapping';
+        content.style.display = 'flex';
+        toast('✅ Analysis finished successfully!');
+        content.scrollIntoView({ behavior: 'smooth' });
+      } catch (err) {
+        console.error(err);
+        toast(`❌ Calculation Error: ${err.message}`);
+      }
+    });
+
+    // 2. Wide-Format Alignment Calculator
+    function calculateWideAlignment(tsIdx) {
+      // Map select values to index map
+      const mapping = {
+        1: mapCh1.value === 'skip' ? null : parseInt(mapCh1.value, 10),
+        2: mapCh2.value === 'skip' ? null : parseInt(mapCh2.value, 10),
+        3: mapCh3.value === 'skip' ? null : parseInt(mapCh3.value, 10),
+        4: mapCh4.value === 'skip' ? null : parseInt(mapCh4.value, 10),
+      };
+
+      const activeChannels = [1, 2, 3, 4].filter(ch => mapping[ch] !== null);
+      if (!activeChannels.length) {
+        throw new Error('Please map at least one sEMG channel.');
+      }
+
+      const colCounts = {}; // colIdx -> non-empty valid numbers count
+      activeChannels.forEach(ch => {
+        colCounts[mapping[ch]] = 0;
+      });
+
       const parsedData = [];
+      let totalRowsParsed = 0;
 
-      dataRows.forEach(line => {
+      parsedRows.forEach(line => {
         const cells = line.split(',');
-        if (cells.length < headers.length) return;
+        if (cells.length < parsedHeaders.length) return;
         parsedData.push(cells);
+        totalRowsParsed++;
 
-        muscleColIndices.forEach(idx => {
+        activeChannels.forEach(ch => {
+          const idx = mapping[ch];
           const val = cells[idx];
           if (val !== undefined && val !== '' && val !== 'NaN' && !isNaN(parseFloat(val))) {
-            colCounts[idx] = (colCounts[idx] || 0) + 1;
+            colCounts[idx]++;
           }
         });
       });
 
       const totalFrames = parsedData.length;
-      
-      // Determine active columns (those with at least 1 sample)
-      const activeIndices = muscleColIndices.filter(idx => (colCounts[idx] || 0) > 0);
-      const activeChannels = activeIndices.map(idx => {
-        const name = headers[idx];
-        const match = name.match(/muscle(\d+)|ch(\d+)/i);
-        return match ? parseInt(match[1] || match[2], 10) : idx;
-      });
-
       let alignedRowsCount = 0;
+
       parsedData.forEach(cells => {
-        const isAligned = activeIndices.every(idx => {
+        const isAligned = activeChannels.every(ch => {
+          const idx = mapping[ch];
           const val = cells[idx];
           return val !== undefined && val !== '' && val !== 'NaN' && !isNaN(parseFloat(val));
         });
@@ -811,7 +1089,7 @@
 
       const alignedPct = totalFrames > 0 ? Math.round((alignedRowsCount / totalFrames) * 1000) / 10 : 0;
 
-      // Update basic details
+      // Update Basic Stats UI
       document.getElementById('out-pct').textContent = alignedPct + '%';
       document.getElementById('out-total').textContent = totalFrames;
       document.getElementById('out-aligned').textContent = alignedRowsCount;
@@ -823,16 +1101,16 @@
       // Render Channel coverage meters
       const metersList = document.getElementById('channels-meters-list');
       let metersHtml = '';
-      activeIndices.forEach((idx, i) => {
-        const chNum = activeChannels[i];
-        const count = colCounts[idx] || 0;
+      activeChannels.forEach(ch => {
+        const colIdx = mapping[ch];
+        const count = colCounts[colIdx] || 0;
         const pct = totalFrames > 0 ? Math.round((count / totalFrames) * 100) : 0;
-        const color = chColors[chNum] || '#4d9fff';
+        const color = chColors[ch] || '#4d9fff';
         
         metersHtml += `
           <div class="channel-meter-row">
             <div class="channel-meter-info">
-              <span class="channel-meter-name">${headers[idx]}</span>
+              <span class="channel-meter-name">Channel ${ch} (${parsedHeaders[colIdx]})</span>
               <span>${count} samples (${pct}%)</span>
             </div>
             <div class="channel-meter-bg">
@@ -843,11 +1121,11 @@
       });
       metersList.innerHTML = metersHtml;
 
-      // Render Row preview
+      // Render Row preview (first 10 rows)
       const thead = document.getElementById('preview-thead');
-      let theadHtml = '<tr><th>Timestamp / Date</th>';
-      activeIndices.forEach(idx => {
-        theadHtml += `<th>${headers[idx]}</th>`;
+      let theadHtml = `<tr><th>${parsedHeaders[tsIdx]}</th>`;
+      activeChannels.forEach(ch => {
+        theadHtml += `<th>CH${ch} (${parsedHeaders[mapping[ch]]})</th>`;
       });
       theadHtml += '<th>Status</th></tr>';
       thead.innerHTML = theadHtml;
@@ -858,16 +1136,17 @@
       
       for (let i = 0; i < limit; i++) {
         const cells = parsedData[i];
-        const isAligned = activeIndices.every(idx => {
+        const isAligned = activeChannels.every(ch => {
+          const idx = mapping[ch];
           const val = cells[idx];
           return val !== undefined && val !== '' && val !== 'NaN' && !isNaN(parseFloat(val));
         });
 
         tbodyHtml += `<tr class="${isAligned ? '' : 'unaligned'}">`;
-        // first cell is datetime
-        tbodyHtml += `<td>${cells[0] || '—'}</td>`;
+        tbodyHtml += `<td>${cells[tsIdx] || '—'}</td>`;
         
-        activeIndices.forEach(idx => {
+        activeChannels.forEach(ch => {
+          const idx = mapping[ch];
           const val = cells[idx];
           const displayVal = (val === undefined || val === '' || val === 'NaN') ? 'NaN' : parseFloat(val).toFixed(2);
           tbodyHtml += `<td>${displayVal}</td>`;
@@ -877,28 +1156,27 @@
         tbodyHtml += '</tr>';
       }
       tbody.innerHTML = tbodyHtml;
-
-      placeholder.style.display = 'none';
-      content.style.display = 'flex';
     }
 
-    function processLongFormat(headers, dataRows) {
-      const tsIdx = headers.findIndex(h => h.includes('timestamp') || h.includes('ts_us') || h.includes('hw_timestamp'));
-      const chIdx = headers.findIndex(h => h === 'channel' || h === 'ch');
-      const valIdx = headers.findIndex(h => h.includes('mv') || h.includes('value'));
-      const muscleIdx = headers.findIndex(h => h === 'muscle');
+    // 3. Long-Format Alignment Calculator
+    function calculateLongAlignment(tsIdx) {
+      const chColIdx = parseInt(mapLongCh.value, 10);
+      const valColIdx = parseInt(mapLongVal.value, 10);
+
+      if (isNaN(chColIdx) || isNaN(valColIdx)) {
+        throw new Error('Please select both the Channel ID and EMG Value columns.');
+      }
 
       const tsMap = {}; // ts -> Set of channels
       const channelCounts = {}; // channel -> sample count
-      const channelMuscleNames = {}; // channel -> muscle name
 
-      dataRows.forEach(line => {
+      parsedRows.forEach(line => {
         const cells = line.split(',');
-        if (cells.length < headers.length) return;
+        if (cells.length < parsedHeaders.length) return;
 
         const tsVal = cells[tsIdx]?.trim();
-        const chVal = cells[chIdx]?.trim();
-        const rawVal = cells[valIdx]?.trim();
+        const chVal = cells[chColIdx]?.trim();
+        const rawVal = cells[valColIdx]?.trim();
         
         if (!tsVal || !chVal || rawVal === '' || rawVal === 'NaN' || isNaN(parseFloat(rawVal))) return;
 
@@ -907,9 +1185,6 @@
         if (isNaN(ts) || isNaN(ch)) return;
 
         channelCounts[ch] = (channelCounts[ch] || 0) + 1;
-        if (muscleIdx !== -1 && cells[muscleIdx]) {
-          channelMuscleNames[ch] = cells[muscleIdx].trim();
-        }
 
         if (!tsMap[ts]) {
           tsMap[ts] = new Set();
@@ -921,6 +1196,10 @@
       const totalFrames = uniqueTimestamps.length;
       const activeChannels = Object.keys(channelCounts).map(Number).sort((a, b) => a - b);
 
+      if (!activeChannels.length) {
+        throw new Error('No active channels detected in Stacked layout rows.');
+      }
+
       let alignedRowsCount = 0;
       uniqueTimestamps.forEach(ts => {
         const chSet = tsMap[ts];
@@ -930,7 +1209,7 @@
 
       const alignedPct = totalFrames > 0 ? Math.round((alignedRowsCount / totalFrames) * 1000) / 10 : 0;
 
-      // Update details UI
+      // Update basic details UI
       document.getElementById('out-pct').textContent = alignedPct + '%';
       document.getElementById('out-total').textContent = totalFrames;
       document.getElementById('out-aligned').textContent = alignedRowsCount;
@@ -945,7 +1224,7 @@
       activeChannels.forEach(ch => {
         const count = channelCounts[ch] || 0;
         const pct = totalFrames > 0 ? Math.round((count / totalFrames) * 100) : 0;
-        const label = channelMuscleNames[ch] ? `Channel ${ch} (${channelMuscleNames[ch]})` : `Channel ${ch}`;
+        const label = `Channel ${ch}`;
         const color = chColors[ch] || '#4d9fff';
 
         metersHtml += `
@@ -964,7 +1243,7 @@
 
       // Render Row preview for Long Stacked format (first 10 unique hardware timestamps)
       const thead = document.getElementById('preview-thead');
-      let theadHtml = '<tr><th>HW Timestamp (us)</th>';
+      let theadHtml = `<tr><th>${parsedHeaders[tsIdx]}</th>`;
       activeChannels.forEach(ch => {
         theadHtml += `<th>CH${ch}</th>`;
       });
@@ -981,13 +1260,13 @@
         tsValues[ts] = {};
       });
 
-      dataRows.forEach(line => {
+      parsedRows.forEach(line => {
         const cells = line.split(',');
-        if (cells.length < headers.length) return;
+        if (cells.length < parsedHeaders.length) return;
         const ts = parseInt(cells[tsIdx], 10);
         if (tsValues[ts]) {
-          const ch = parseInt(cells[chIdx], 10);
-          const val = parseFloat(cells[valIdx]);
+          const ch = parseInt(cells[chColIdx], 10);
+          const val = parseFloat(cells[valColIdx]);
           if (!isNaN(ch) && !isNaN(val)) {
             tsValues[ts][ch] = val;
           }
@@ -1011,9 +1290,6 @@
         tbodyHtml += '</tr>';
       }
       tbody.innerHTML = tbodyHtml;
-
-      placeholder.style.display = 'none';
-      content.style.display = 'flex';
     }
 
     function updateVerdict(pct) {

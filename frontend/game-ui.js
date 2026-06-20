@@ -7,7 +7,65 @@
    anatomy canvas interactions, and boot actions.
    ═══════════════════════════════════════════════════════ */
 
+function loadCachedGameSession() {
+  try {
+    var cached = localStorage.getItem('emg_game_session_meta');
+    if (cached) {
+      var meta = JSON.parse(cached);
+      if (meta.participant && $('inp-name')) $('inp-name').value = meta.participant;
+      if (meta.sex && $('inp-sex')) $('inp-sex').value = meta.sex;
+      if (meta.age && $('inp-age')) $('inp-age').value = meta.age;
+      if (meta.weight_kg && $('inp-weight')) $('inp-weight').value = meta.weight_kg;
+      if (meta.height_cm && $('inp-height')) $('inp-height').value = meta.height_cm;
+      if (meta.targetLimb && $('inp-limb')) {
+        $('inp-limb').value = meta.targetLimb;
+        SESSION.targetLimb = meta.targetLimb;
+        updateExerciseOptions(meta.targetLimb);
+        updateChannelLabels(meta.targetLimb);
+      }
+      if (meta.exercise && $('inp-exercise')) {
+        $('inp-exercise').value = meta.exercise;
+        SESSION.exercise = meta.exercise;
+      }
+      if (meta.trial_no && $('inp-trial')) $('inp-trial').value = meta.trial_no;
+    }
+  } catch (e) {
+    console.error('Failed to load cached game session:', e);
+  }
+}
+
+function saveCachedGameSession() {
+  try {
+    var meta = {
+      participant: $('inp-name') ? $('inp-name').value : '',
+      sex: $('inp-sex') ? $('inp-sex').value : 'male',
+      age: $('inp-age') ? $('inp-age').value : '25',
+      weight_kg: $('inp-weight') ? $('inp-weight').value : '70',
+      height_cm: $('inp-height') ? $('inp-height').value : '170',
+      exercise: $('inp-exercise') ? $('inp-exercise').value : 'walking',
+      trial_no: $('inp-trial') ? $('inp-trial').value : '1',
+      targetLimb: $('inp-limb') ? $('inp-limb').value : 'leg'
+    };
+    localStorage.setItem('emg_game_session_meta', JSON.stringify(meta));
+  } catch (e) {
+    console.error('Failed to save cached game session:', e);
+  }
+}
+
 function initSetupForm() {
+  // Load cached settings
+  loadCachedGameSession();
+
+  // Save cached settings on changes
+  var inputsToSave = ['inp-name', 'inp-sex', 'inp-age', 'inp-weight', 'inp-height', 'inp-exercise', 'inp-trial', 'inp-limb'];
+  inputsToSave.forEach(function(id) {
+    var el = $(id);
+    if (el) {
+      el.addEventListener('change', saveCachedGameSession);
+      el.addEventListener('input', saveCachedGameSession);
+    }
+  });
+
   // Number of hurdles slider
   var hurdlesInp = $('inp-hurdles');
   if (hurdlesInp) {

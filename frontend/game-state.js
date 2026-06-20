@@ -40,7 +40,7 @@ var SESSION = {
   age: 25,
   weight_kg: 70,
   height_cm: 170,
-  exercise: 'leg_press',
+  exercise: 'walking',
   trial_no: 1,
   sessionId: '',
   numHurdles: 10,
@@ -110,15 +110,15 @@ var MIN_HURDLE_H = 40;       // shortest hurdle height px
 // ── Global configurations & maps ──────────────────────
 var LIMB_EXERCISES = {
   leg: [
-    { value: 'leg_press', label: 'Leg Press', selected: true },
-    { value: 'lunges', label: 'Lunges' },
+    { value: 'walking', label: 'Walking', selected: true },
+    { value: 'stair_ascent', label: 'Stair Ascent' },
+    { value: 'stair_descent', label: 'Stair Descent' },
+    { value: 'calf_raises', label: 'Calf Raises' },
     { value: 'leg_curl', label: 'Leg Curl' },
-    { value: 'squarts', label: 'Squarts' },
-    { value: 'calf_raise', label: 'Calf Raise' },
-    { value: 'walking', label: 'Walking' },
-    { value: 'jumpin', label: 'Jumpin' },
-    { value: 'stair_up_climb', label: 'Stair Up Climb' },
-    { value: 'stair_down', label: 'Stair Down' }
+    { value: 'lunges', label: 'Lunges' },
+    { value: 'leg_press', label: 'Leg Press' },
+    { value: 'squats', label: 'Squats' },
+    { value: 'jumping', label: 'Jumping' }
   ],
   arm: [
     { value: 'bicep_curl', label: 'Bicep Curl', selected: true },

@@ -796,9 +796,9 @@ function readGameSessionMeta() {
     age: parseInt($('inp-age').value, 10) || 25,
     weight_kg: parseFloat($('inp-weight').value) || 70,
     height_cm: parseFloat($('inp-height').value) || 170,
-    exercise: $('inp-exercise').value || 'leg_press',
+    exercise: $('inp-exercise').value || 'walking',
     trial_no: parseInt($('inp-trial').value, 10) || 1,
-    label: $('inp-exercise').value || 'leg_press',
+    label: $('inp-exercise').value || 'walking',
     targetLimb: $('inp-limb').value || 'leg',
   };
 }

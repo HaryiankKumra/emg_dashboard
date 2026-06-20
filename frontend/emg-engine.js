@@ -25,15 +25,15 @@ const BEACON_INTERVAL_US = 1000;
 /** Shared research protocol options (monitor + game). */
 const RESEARCH = {
   EXERCISES: [
-    { value: 'leg_press',      label: 'Leg Press' },
-    { value: 'lunges',         label: 'Lunges' },
-    { value: 'leg_curl',       label: 'Leg Curl' },
-    { value: 'squarts',        label: 'Squarts' },
-    { value: 'calf_raise',     label: 'Calf Raise' },
     { value: 'walking',        label: 'Walking' },
-    { value: 'jumpin',         label: 'Jumpin' },
-    { value: 'stair_up_climb', label: 'Stair Up Climb' },
-    { value: 'stair_down',     label: 'Stair Down' },
+    { value: 'stair_ascent',   label: 'Stair Ascent' },
+    { value: 'stair_descent',  label: 'Stair Descent' },
+    { value: 'calf_raises',    label: 'Calf Raises' },
+    { value: 'leg_curl',       label: 'Leg Curl' },
+    { value: 'lunges',         label: 'Lunges' },
+    { value: 'leg_press',      label: 'Leg Press' },
+    { value: 'squats',         label: 'Squats' },
+    { value: 'jumping',        label: 'Jumping' },
   ],
   TRIALS: [1, 2, 3, 4, 5],
   SEX_OPTIONS: [
@@ -392,7 +392,7 @@ class Recorder {
     this._age                = 25;
     this._weight_kg          = 70;
     this._height_cm          = 170;
-    this._exercise           = 'leg_press';
+    this._exercise           = 'walking';
     this._trial_no           = 1;
     this._session_timestamp  = '';
     this._timezone           = getSystemTimezone();
@@ -436,7 +436,7 @@ class Recorder {
     age          = 25,
     weight_kg    = 70,
     height_cm    = 170,
-    exercise     = 'leg_press',
+    exercise     = 'walking',
     trial_no     = 1,
   } = {}) {
     this._chSamples    = { 1: [], 2: [], 3: [], 4: [] };
@@ -446,7 +446,7 @@ class Recorder {
     this._age          = Math.max(1, Math.min(120, parseInt(age, 10) || 25));
     this._weight_kg    = weight_kg;
     this._height_cm    = height_cm;
-    this._exercise     = exercise || 'leg_press';
+    this._exercise     = exercise || 'walking';
     this._trial_no     = Math.max(1, Math.min(5, parseInt(trial_no, 10) || 1));
     this._label        = (label || this._exercise).trim() || this._exercise;
     this._session_timestamp = new Date().toISOString();

@@ -306,9 +306,9 @@ function readSessionMeta() {
     age: parseInt(dom.participantAge?.value, 10) || 25,
     weight_kg: parseFloat(dom.participantWeight?.value) || 70,
     height_cm: parseFloat(dom.participantHeight?.value) || 170,
-    exercise: dom.exerciseType?.value || 'squat',
+    exercise: dom.exerciseType?.value || 'walking',
     trial_no: parseInt(dom.trialNo?.value, 10) || 1,
-    label: dom.exerciseType?.value || 'squat',
+    label: dom.exerciseType?.value || 'walking',
   };
 }
 
@@ -437,7 +437,52 @@ SerialWeb.onDisconnect = () => {
   dom.connectBtn.disabled = !SerialWeb.isSupported();
 };
 
+function loadCachedSession() {
+  try {
+    const cached = localStorage.getItem('emg_session_meta');
+    if (cached) {
+      const meta = JSON.parse(cached);
+      if (meta.participant && dom.participantName) dom.participantName.value = meta.participant;
+      if (meta.sex && dom.participantSex) dom.participantSex.value = meta.sex;
+      if (meta.age && dom.participantAge) dom.participantAge.value = meta.age;
+      if (meta.weight_kg && dom.participantWeight) dom.participantWeight.value = meta.weight_kg;
+      if (meta.height_cm && dom.participantHeight) dom.participantHeight.value = meta.height_cm;
+      if (meta.exercise && dom.exerciseType) dom.exerciseType.value = meta.exercise;
+      if (meta.trial_no && dom.trialNo) dom.trialNo.value = meta.trial_no;
+    }
+  } catch (e) {
+    console.error('Failed to load cached session:', e);
+  }
+}
+
+function saveCachedSession() {
+  try {
+    const meta = {
+      participant: dom.participantName?.value || '',
+      sex: dom.participantSex?.value || 'male',
+      age: dom.participantAge?.value || '25',
+      weight_kg: dom.participantWeight?.value || '70',
+      height_cm: dom.participantHeight?.value || '170',
+      exercise: dom.exerciseType?.value || 'walking',
+      trial_no: dom.trialNo?.value || '1',
+    };
+    localStorage.setItem('emg_session_meta', JSON.stringify(meta));
+  } catch (e) {
+    console.error('Failed to save cached session:', e);
+  }
+}
+
 (async function init() {
+  loadCachedSession();
+  
+  // Save cached session details on changes
+  [dom.participantName, dom.participantSex, dom.participantAge, dom.participantWeight, dom.participantHeight, dom.exerciseType, dom.trialNo].forEach(el => {
+    if (el) {
+      el.addEventListener('change', saveCachedSession);
+      el.addEventListener('input', saveCachedSession);
+    }
+  });
+
   showCompatBanner();
   EmgEngine.startBroadcast();
   await updateGrantedInfo();

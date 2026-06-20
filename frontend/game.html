@@ -330,6 +330,7 @@
         <button class="btn-secondary small" id="export-attempts-btn">📊 Export Attempts CSV</button>
         <button class="btn-secondary small" id="export-emg-filtered-btn">↓ EMG Filtered CSV</button>
         <button class="btn-secondary small" id="export-emg-raw-btn">↓ EMG Raw CSV</button>
+        <button class="btn-secondary small" id="game-alignment-btn">📊 Alignment %</button>
         <button class="btn-secondary small" id="new-session-btn">New Protocol</button>
         <a href="/" class="btn-ghost small">← Monitor</a>
       </div>
@@ -338,6 +339,18 @@
   </div>
 
 </div><!-- #app -->
+
+<!-- ── Alignment Analysis Modal ── -->
+<div id="align-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;" role="dialog" aria-modal="true" aria-labelledby="align-modal-title">
+  <div style="background:#1b2030;border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:24px;width:min(480px, 94vw);box-shadow:0 12px 36px rgba(0,0,0,0.5);color:#e8ecf4;font-family:sans-serif;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <h2 id="align-modal-title" style="margin:0;font-size:1.2rem;font-weight:700;color:#e8ecf4;">📊 Data Alignment Analysis</h2>
+      <button id="align-modal-close" style="background:none;border:none;color:#6b7590;font-size:1.4rem;cursor:pointer;line-height:1;" aria-label="Close">&times;</button>
+    </div>
+    <div id="align-modal-body"></div>
+  </div>
+</div>
+
 <script src="emg-engine.js"></script>
 <script src="serial-web.js"></script>
 <script src="game-state.js"></script>

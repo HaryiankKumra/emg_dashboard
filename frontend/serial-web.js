@@ -24,25 +24,27 @@ const SerialWeb = {
 
   /** Web Serial requires HTTPS (or localhost). */
   isSupported() {
+    const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+    if (isAndroid) return true; // Pretend supported so we let Android users try
     return typeof navigator !== 'undefined' && 'serial' in navigator;
   },
 
   /** Human-readable browser support message. */
   supportMessage() {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    if (/Android/i.test(ua)) {
+      return null; // Do not show warning for Android, let them try
+    }
     if (this.isSupported()) return null;
-    const ua = navigator.userAgent;
     if (/iPhone|iPad|iPod/i.test(ua)) {
       return 'Web Serial is not available on iOS. Use Chrome or Edge on a laptop/desktop with USB.';
-    }
-    if (/Android/i.test(ua)) {
-      return 'Android: use Chrome with a USB OTG cable. Support is limited compared to desktop.';
     }
     return 'Use Chrome, Edge, or Opera on desktop. Firefox and Safari do not support Web Serial.';
   },
 
   /** Ports the user already granted for this site. */
   async getGrantedPorts() {
-    if (!this.isSupported()) return [];
+    if (typeof navigator === 'undefined' || !navigator.serial) return [];
     return navigator.serial.getPorts();
   },
 
@@ -51,8 +53,8 @@ const SerialWeb = {
    * Must be called from a user gesture (button click).
    */
   async connect(baudRate = 921600, existingPort = null) {
-    if (!this.isSupported()) {
-      throw new Error(this.supportMessage());
+    if (typeof navigator === 'undefined' || !navigator.serial) {
+      throw new Error('Web Serial API is not available in this browser. Try Chrome on Android with OTG, or enable the experimental Web Serial API flag.');
     }
     if (this.connected) await this.disconnect();
 

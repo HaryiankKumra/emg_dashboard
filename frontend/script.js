@@ -306,9 +306,9 @@ function readSessionMeta() {
     age: parseInt(dom.participantAge?.value, 10) || 25,
     weight_kg: parseFloat(dom.participantWeight?.value) || 70,
     height_cm: parseFloat(dom.participantHeight?.value) || 170,
-    exercise: dom.exerciseType?.value || 'squat',
+    exercise: dom.exerciseType?.value || 'leg_press',
     trial_no: parseInt(dom.trialNo?.value, 10) || 1,
-    label: dom.exerciseType?.value || 'squat',
+    label: dom.exerciseType?.value || 'leg_press',
   };
 }
 

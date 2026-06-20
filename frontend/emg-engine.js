@@ -25,14 +25,15 @@ const BEACON_INTERVAL_US = 1000;
 /** Shared research protocol options (monitor + game). */
 const RESEARCH = {
   EXERCISES: [
-    { value: 'jump',       label: 'Jump' },
-    { value: 'squat',      label: 'Squat' },
-    { value: 'lunge',      label: 'Lunge' },
-    { value: 'deadlift',   label: 'Deadlift / Stair Climbing' },
-    { value: 'calf_raise', label: 'Calf Raise' },
-    { value: 'box_jump',   label: 'Box Jump / Walking' },
-    { value: 'walking',    label: 'Walking' },
-    { value: 'stair_climb',label: 'Stair Climbing' },
+    { value: 'leg_press',      label: 'Leg Press' },
+    { value: 'lunges',         label: 'Lunges' },
+    { value: 'leg_curl',       label: 'Leg Curl' },
+    { value: 'squarts',        label: 'Squarts' },
+    { value: 'calf_raise',     label: 'Calf Raise' },
+    { value: 'walking',        label: 'Walking' },
+    { value: 'jumpin',         label: 'Jumpin' },
+    { value: 'stair_up_climb', label: 'Stair Up Climb' },
+    { value: 'stair_down',     label: 'Stair Down' },
   ],
   TRIALS: [1, 2, 3, 4, 5],
   SEX_OPTIONS: [
@@ -42,12 +43,12 @@ const RESEARCH = {
 };
 
 // Channel label map for CSV headers
-const CH_MUSCLE_LABEL = { 1: 'RF', 2: 'BF', 3: 'GAS', 4: 'TA' };
+const CH_MUSCLE_LABEL = { 1: 'muscle1', 2: 'muscle2', 3: 'muscle3', 4: 'muscle4' };
 const CH_MUSCLE_FULL  = {
-  1: 'Rectus_Femoris',
-  2: 'Biceps_Femoris',
-  3: 'Gastrocnemius',
-  4: 'Tibialis_Anterior',
+  1: 'muscle1',
+  2: 'muscle2',
+  3: 'muscle3',
+  4: 'muscle4',
 };
 
 // ── Biquad IIR (RBJ cookbook) ────────────────────────────────────────────────
@@ -391,7 +392,7 @@ class Recorder {
     this._age                = 25;
     this._weight_kg          = 70;
     this._height_cm          = 170;
-    this._exercise           = 'squat';
+    this._exercise           = 'leg_press';
     this._trial_no           = 1;
     this._session_timestamp  = '';
     this._timezone           = getSystemTimezone();
@@ -435,7 +436,7 @@ class Recorder {
     age          = 25,
     weight_kg    = 70,
     height_cm    = 170,
-    exercise     = 'squat',
+    exercise     = 'leg_press',
     trial_no     = 1,
   } = {}) {
     this._chSamples    = { 1: [], 2: [], 3: [], 4: [] };
@@ -445,7 +446,7 @@ class Recorder {
     this._age          = Math.max(1, Math.min(120, parseInt(age, 10) || 25));
     this._weight_kg    = weight_kg;
     this._height_cm    = height_cm;
-    this._exercise     = exercise || 'squat';
+    this._exercise     = exercise || 'leg_press';
     this._trial_no     = Math.max(1, Math.min(5, parseInt(trial_no, 10) || 1));
     this._label        = (label || this._exercise).trim() || this._exercise;
     this._session_timestamp = new Date().toISOString();

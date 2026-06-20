@@ -1,361 +1,381 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MyoHurdle Protocol — EMG Motor Training System</title>
-  <meta name="description" content="Research-grade EMG biofeedback hurdle training. Configurable protocol with per-session analytics.">
+  <meta name="description"
+    content="Research-grade EMG biofeedback hurdle training. Configurable protocol with per-session analytics.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="game.css">
 </head>
+
 <body>
-<div id="app">
+  <div id="app">
 
-  <!-- Game Canvas -->
-  <canvas id="game-canvas"></canvas>
+    <!-- Game Canvas -->
+    <canvas id="game-canvas"></canvas>
 
-  <!-- Nav: back + WS status -->
-  <a href="/" id="back-btn">← Monitor</a>
-  <div id="ws-pill">
-    <div id="ws-dot"></div>
-    <span id="ws-lbl">EMG OFFLINE</span>
-  </div>
+    <!-- Nav: back + WS status -->
+    <a href="/" id="back-btn">← Monitor</a>
+    <div id="ws-pill">
+      <div id="ws-dot"></div>
+      <span id="ws-lbl">EMG OFFLINE</span>
+    </div>
 
-  <!-- ═══════════════════════════════════════════
+    <!-- ═══════════════════════════════════════════
        SETUP OVERLAY
   ═══════════════════════════════════════════ -->
-  <div class="overlay" id="setup-overlay">
-    <div class="panel setup-panel">
+    <div class="overlay" id="setup-overlay">
+      <div class="panel setup-panel">
 
-      <div class="panel-header">
-        <div class="brand-logo">Myo<span class="accent">Hurdle</span></div>
-        <div class="brand-sub">EMG MOTOR TRAINING PROTOCOL</div>
-      </div>
+        <div class="panel-header">
+          <div class="brand-logo">Myo<span class="accent">Hurdle</span></div>
+          <div class="brand-sub">EMG MOTOR TRAINING PROTOCOL</div>
+        </div>
 
-      <div class="setup-grid">
-        
-        <!-- Left Column: Settings -->
-        <div class="setup-col-left">
-          
-          <!-- Step 1: Basic params -->
-          <div class="step-card">
-            <div class="step-num">STEP 1</div>
-            <div class="step-title">Protocol Parameters</div>
+        <div class="setup-grid">
 
-            <div class="form-grid">
-              <div class="form-row">
-                <label class="form-lbl">Participant ID</label>
-                <input id="inp-name" class="form-inp" type="text" placeholder="e.g. P001" value="P001" autocomplete="off">
-              </div>
+          <!-- Left Column: Settings -->
+          <div class="setup-col-left">
 
-              <div class="form-row form-row-2">
-                <div>
-                  <label class="form-lbl">Sex</label>
-                  <select id="inp-sex" class="form-inp">
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                  </select>
+            <!-- Step 1: Basic params -->
+            <div class="step-card">
+              <div class="step-num">STEP 1</div>
+              <div class="step-title">Protocol Parameters</div>
+
+              <div class="form-grid">
+                <div class="form-row">
+                  <label class="form-lbl">Participant ID</label>
+                  <input id="inp-name" class="form-inp" type="text" placeholder="e.g. P001" value="P001"
+                    autocomplete="off">
                 </div>
-                <div>
-                  <label class="form-lbl">Age (years)</label>
-                  <input id="inp-age" class="form-inp" type="number" min="10" max="100" value="25">
-                </div>
-              </div>
 
-              <div class="form-row form-row-2">
-                <div>
-                  <label class="form-lbl">Weight (kg)</label>
-                  <input id="inp-weight" class="form-inp" type="number" min="20" max="300" step="0.5" value="70">
-                </div>
-                <div>
-                  <label class="form-lbl">Height (cm)</label>
-                  <input id="inp-height" class="form-inp" type="number" min="100" max="250" step="1" value="170">
-                </div>
-              </div>
-
-              <div class="form-row form-row-2">
-                <div>
-                  <label class="form-lbl">Target Limb</label>
-                  <select id="inp-limb" class="form-inp">
-                    <option value="leg" selected>🦵 Leg Muscles</option>
-                    <option value="arm">💪 Arm Muscles</option>
-                    <option value="weightlifting">🏋️ Weightlifting</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="form-lbl">Exercise</label>
-                  <div style="display: flex; gap: 6px;">
-                    <select id="inp-exercise" class="form-inp" style="flex: 1; min-width: 0;">
-                      <!-- Dynamic -->
+                <div class="form-row form-row-2">
+                  <div>
+                    <label class="form-lbl">Sex</label>
+                    <select id="inp-sex" class="form-inp">
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
                     </select>
-                    <button type="button" class="ch-btn" id="add-exercise-btn" style="padding: 0 10px; margin: 0; height: 38px; display: flex; align-items: center; justify-content: center;" title="Add Custom Exercise">➕</button>
+                  </div>
+                  <div>
+                    <label class="form-lbl">Age (years)</label>
+                    <input id="inp-age" class="form-inp" type="number" min="10" max="100" value="25">
                   </div>
                 </div>
-                <div>
-                  <label class="form-lbl">Trial No.</label>
-                  <select id="inp-trial" class="form-inp">
-                    <option value="1" selected>1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
+
+                <div class="form-row form-row-2">
+                  <div>
+                    <label class="form-lbl">Weight (kg)</label>
+                    <input id="inp-weight" class="form-inp" type="number" min="20" max="300" step="0.5" value="70">
+                  </div>
+                  <div>
+                    <label class="form-lbl">Height (cm)</label>
+                    <input id="inp-height" class="form-inp" type="number" min="100" max="250" step="1" value="170">
+                  </div>
+                </div>
+
+                <div class="form-row form-row-2">
+                  <div>
+                    <label class="form-lbl">Target Limb</label>
+                    <select id="inp-limb" class="form-inp">
+                      <option value="leg" selected>🦵 Leg Muscles</option>
+                      <option value="arm">💪 Arm Muscles</option>
+                      <option value="weightlifting">🏋️ Weightlifting</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="form-lbl">Exercise</label>
+                    <div style="display: flex; gap: 6px;">
+                      <select id="inp-exercise" class="form-inp" style="flex: 1; min-width: 0;">
+                        <!-- Dynamic -->
+                      </select>
+                      <button type="button" class="ch-btn" id="add-exercise-btn"
+                        style="padding: 0 10px; margin: 0; height: 38px; display: flex; align-items: center; justify-content: center;"
+                        title="Add Custom Exercise">➕</button>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="form-lbl">Trial No.</label>
+                    <select id="inp-trial" class="form-inp">
+                      <option value="1" selected>1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <label class="form-lbl">Number of Hurdles</label>
+                  <div class="slider-row">
+                    <input id="inp-hurdles" type="range" min="1" max="30" value="10">
+                    <span class="slider-val" id="hurdles-val">10</span>
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <label class="form-lbl">Attempt Time Limit</label>
+                  <div class="slider-row">
+                    <input id="inp-timelimit" type="range" min="3" max="15" value="5">
+                    <span class="slider-val" id="timelimit-val">5 s</span>
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <label class="form-lbl">Control Channels (select one or more muscles)</label>
+                  <div class="channel-picker" id="channel-picker">
+                    <button type="button" class="ch-btn" data-ch="0" id="ch-btn-0">🤖 Auto (Highest RMS)</button>
+                    <button type="button" class="ch-btn active" data-ch="1" id="ch-btn-1">CH1 — Rectus Femoris</button>
+                    <button type="button" class="ch-btn" data-ch="2" id="ch-btn-2">CH2 — Biceps Femoris</button>
+                    <button type="button" class="ch-btn" data-ch="3" id="ch-btn-3">CH3 — Gastrocnemius</button>
+                    <button type="button" class="ch-btn" data-ch="4" id="ch-btn-4">CH4 — Spare</button>
+                  </div>
+                  <div class="ch-live-preview" id="ch-live-preview">Live RMS: — mV</div>
+                </div>
+
+                <div class="form-row" id="comb-mode-row" style="display: none;">
+                  <label class="form-lbl">Multi-Muscle Control Mode</label>
+                  <select id="inp-comb-mode" class="form-inp">
+                    <option value="avg" selected>Average RMS (Smooth combined effort)</option>
+                    <option value="max">Max RMS (Any muscle above threshold)</option>
+                    <option value="min">Min RMS (All muscles above threshold simultaneously)</option>
                   </select>
                 </div>
               </div>
-
-              <div class="form-row">
-                <label class="form-lbl">Number of Hurdles</label>
-                <div class="slider-row">
-                  <input id="inp-hurdles" type="range" min="1" max="30" value="10">
-                  <span class="slider-val" id="hurdles-val">10</span>
-                </div>
-              </div>
-
-              <div class="form-row">
-                <label class="form-lbl">Attempt Time Limit</label>
-                <div class="slider-row">
-                  <input id="inp-timelimit" type="range" min="3" max="15" value="5">
-                  <span class="slider-val" id="timelimit-val">5 s</span>
-                </div>
-              </div>
-
-              <div class="form-row">
-                <label class="form-lbl">Control Channels (select one or more muscles)</label>
-                <div class="channel-picker" id="channel-picker">
-                  <button type="button" class="ch-btn" data-ch="0" id="ch-btn-0">🤖 Auto (Highest RMS)</button>
-                  <button type="button" class="ch-btn active" data-ch="1" id="ch-btn-1">CH1 — Rectus Femoris</button>
-                  <button type="button" class="ch-btn" data-ch="2" id="ch-btn-2">CH2 — Biceps Femoris</button>
-                  <button type="button" class="ch-btn" data-ch="3" id="ch-btn-3">CH3 — Gastrocnemius</button>
-                  <button type="button" class="ch-btn" data-ch="4" id="ch-btn-4">CH4 — Spare</button>
-                </div>
-                <div class="ch-live-preview" id="ch-live-preview">Live RMS: — mV</div>
-              </div>
-
-              <div class="form-row" id="comb-mode-row" style="display: none;">
-                <label class="form-lbl">Multi-Muscle Control Mode</label>
-                <select id="inp-comb-mode" class="form-inp">
-                  <option value="avg" selected>Average RMS (Smooth combined effort)</option>
-                  <option value="max">Max RMS (Any muscle above threshold)</option>
-                  <option value="min">Min RMS (All muscles above threshold simultaneously)</option>
-                </select>
-              </div>
             </div>
+
+            <!-- Step 2: Calibration -->
+            <div class="step-card">
+              <div class="step-num">STEP 2</div>
+              <div class="step-title">Set Your Target Strength</div>
+              <div class="step-desc">Flex your target muscle(s) at your desired effort level. The system records this as
+                your jump threshold.</div>
+
+              <div id="calib-result-badge" class="calib-badge hidden">
+                ✓ Target set: <span id="calib-result-mV">—</span>
+              </div>
+
+              <div class="calib-live-wrap hidden" id="setup-live-wrap">
+                <div class="calib-live-bar-bg">
+                  <div class="calib-live-bar-fg" id="setup-live-fg"></div>
+                </div>
+                <div class="calib-live-rms" id="setup-live-rms">0 mV</div>
+              </div>
+
+              <button type="button" class="btn-secondary" id="calib-sample-btn">📡 Start Sample Flex (5 s)</button>
+            </div>
+
           </div>
 
-          <!-- Step 2: Calibration -->
-          <div class="step-card">
-            <div class="step-num">STEP 2</div>
-            <div class="step-title">Set Your Target Strength</div>
-            <div class="step-desc">Flex your target muscle(s) at your desired effort level. The system records this as your jump threshold.</div>
-
-            <div id="calib-result-badge" class="calib-badge hidden">
-              ✓ Target set: <span id="calib-result-mV">—</span>
-            </div>
-
-            <div class="calib-live-wrap hidden" id="setup-live-wrap">
-              <div class="calib-live-bar-bg">
-                <div class="calib-live-bar-fg" id="setup-live-fg"></div>
+          <!-- Right Column: Interactive Anatomy & Placement Guide -->
+          <div class="setup-col-right">
+            <div class="step-card guide-card">
+              <div class="step-num"
+                style="border-color: var(--teal); color: var(--teal); display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <span>ELECTRODE GUIDE</span>
+                <button type="button" class="ch-btn" id="anatomy-zoom-btn"
+                  style="padding: 2px 8px; margin: 0; font-size: 8.5px; border-radius: 6px; height: 18px; line-height: 12px; min-width: 60px;">🔍
+                  Zoom</button>
               </div>
-              <div class="calib-live-rms" id="setup-live-rms">0 mV</div>
-            </div>
+              <div class="step-title">Anatomy &amp; Muscle Activation</div>
+              <div class="step-desc" id="guide-desc">Place electrodes as highlighted on the limb. Follow instructions
+                below to contract target muscles.</div>
 
-            <button type="button" class="btn-secondary" id="calib-sample-btn">📡 Start Sample Flex (5 s)</button>
+              <div class="anatomy-wrap">
+                <canvas id="anatomy-canvas" width="220" height="320"></canvas>
+              </div>
+
+              <div class="guide-box" id="guide-box">
+                Select a muscle channel to view instructions.
+              </div>
+            </div>
           </div>
 
         </div>
 
-        <!-- Right Column: Interactive Anatomy & Placement Guide -->
-        <div class="setup-col-right">
-          <div class="step-card guide-card">
-            <div class="step-num" style="border-color: var(--teal); color: var(--teal); display: flex; justify-content: space-between; align-items: center; width: 100%;">
-              <span>ELECTRODE GUIDE</span>
-              <button type="button" class="ch-btn" id="anatomy-zoom-btn" style="padding: 2px 8px; margin: 0; font-size: 8.5px; border-radius: 6px; height: 18px; line-height: 12px; min-width: 60px;">🔍 Zoom</button>
-            </div>
-            <div class="step-title">Anatomy &amp; Muscle Activation</div>
-            <div class="step-desc" id="guide-desc">Place electrodes as highlighted on the limb. Follow instructions below to contract target muscles.</div>
-            
-            <div class="anatomy-wrap">
-              <canvas id="anatomy-canvas" width="220" height="320"></canvas>
-            </div>
-            
-            <div class="guide-box" id="guide-box">
-              Select a muscle channel to view instructions.
-            </div>
-          </div>
-        </div>
-
+        <button type="button" class="btn-primary" id="start-btn" disabled style="margin-top:20px; width:100%;">Begin
+          Protocol →</button>
       </div>
-
-      <button type="button" class="btn-primary" id="start-btn" disabled style="margin-top:20px; width:100%;">Begin Protocol →</button>
     </div>
-  </div>
 
-  <!-- ═══════════════════════════════════════════
+    <!-- ═══════════════════════════════════════════
        CALIBRATION OVERLAY
   ═══════════════════════════════════════════ -->
-  <div class="overlay hidden" id="calib-overlay">
-    <div class="panel calib-panel">
+    <div class="overlay hidden" id="calib-overlay">
+      <div class="panel calib-panel">
 
-      <div class="panel-header">
-        <div class="brand-logo" style="font-size:22px">Calibration</div>
-        <div class="brand-sub" id="calib-phase-label">PHASE 1 / 2 — BASELINE</div>
-      </div>
-
-      <div class="calib-count-display" id="calib-count">3</div>
-      <div class="calib-instr" id="calib-instr">🧘 Relax your forearm completely…</div>
-
-      <div class="calib-bar-wrap">
-        <div class="calib-bar-bg">
-          <div class="calib-bar-fg" id="calib-bar-fg"></div>
+        <div class="panel-header">
+          <div class="brand-logo" style="font-size:22px">Calibration</div>
+          <div class="brand-sub" id="calib-phase-label">PHASE 1 / 2 — BASELINE</div>
         </div>
-        <div class="calib-bar-rms" id="calib-bar-rms">0 mV</div>
+
+        <div class="calib-count-display" id="calib-count">3</div>
+        <div class="calib-instr" id="calib-instr">🧘 Relax your forearm completely…</div>
+
+        <div class="calib-bar-wrap">
+          <div class="calib-bar-bg">
+            <div class="calib-bar-fg" id="calib-bar-fg"></div>
+          </div>
+          <div class="calib-bar-rms" id="calib-bar-rms">0 mV</div>
+        </div>
+
+        <div class="calib-note" id="calib-note">Recording resting baseline…</div>
+
+        <button class="btn-ghost small" id="skip-calib-btn">Skip (use 30 mV default)</button>
       </div>
-
-      <div class="calib-note" id="calib-note">Recording resting baseline…</div>
-
-      <button class="btn-ghost small" id="skip-calib-btn">Skip (use 30 mV default)</button>
     </div>
-  </div>
 
-  <!-- ═══════════════════════════════════════════
+    <!-- ═══════════════════════════════════════════
        COUNTDOWN OVERLAY
   ═══════════════════════════════════════════ -->
-  <div class="overlay hidden" id="cd-overlay">
-    <div style="text-align:center">
-      <div class="cd-big" id="cd-big">3</div>
-      <div class="cd-sub" id="cd-sub">GET READY</div>
+    <div class="overlay hidden" id="cd-overlay">
+      <div style="text-align:center">
+        <div class="cd-big" id="cd-big">3</div>
+        <div class="cd-sub" id="cd-sub">GET READY</div>
+      </div>
     </div>
-  </div>
 
-  <!-- ═══════════════════════════════════════════
+    <!-- ═══════════════════════════════════════════
        AT-HURDLE FLEX PANEL (in-game overlay)
   ═══════════════════════════════════════════ -->
-  <div class="overlay hidden" id="flex-overlay">
-    <div class="flex-panel">
+    <div class="overlay hidden" id="flex-overlay">
+      <div class="flex-panel">
 
-      <!-- Header row -->
-      <div class="flex-header">
-        <div class="flex-hurdle-id" id="flex-hurdle-id">HURDLE 1 / 10</div>
-        <div class="flex-attempt-badge" id="flex-attempt-badge">ATTEMPT 1</div>
-        <div class="flex-countdown-ring">
-          <svg width="64" height="64" viewBox="0 0 64 64">
-            <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="5"/>
-            <circle id="cd-arc" cx="32" cy="32" r="26" fill="none" stroke="#00e5d4" stroke-width="5"
-                    stroke-linecap="round" stroke-dasharray="163.4" stroke-dashoffset="0"
-                    transform="rotate(-90 32 32)"/>
-          </svg>
-          <div class="cd-arc-num" id="cd-arc-num">5.0</div>
+        <!-- Header row -->
+        <div class="flex-header">
+          <div class="flex-hurdle-id" id="flex-hurdle-id">HURDLE 1 / 10</div>
+          <div class="flex-attempt-badge" id="flex-attempt-badge">ATTEMPT 1</div>
+          <div class="flex-countdown-ring">
+            <svg width="64" height="64" viewBox="0 0 64 64">
+              <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="5" />
+              <circle id="cd-arc" cx="32" cy="32" r="26" fill="none" stroke="#00e5d4" stroke-width="5"
+                stroke-linecap="round" stroke-dasharray="163.4" stroke-dashoffset="0" transform="rotate(-90 32 32)" />
+            </svg>
+            <div class="cd-arc-num" id="cd-arc-num">5.0</div>
+          </div>
         </div>
+
+        <!-- Large EMG power bar -->
+        <div class="power-section">
+          <div class="power-labels">
+            <span class="power-lbl-left">REST</span>
+            <span class="power-lbl-right" id="power-lbl-right">TARGET (— mV)</span>
+          </div>
+          <div class="power-bar-outer">
+            <div class="power-bar-fill" id="power-bar-fill"></div>
+            <div class="power-threshold-line" id="power-thr-line"></div>
+          </div>
+          <div class="power-rms-display" id="power-rms-display">0 mV</div>
+          <div class="power-instruct" id="power-instruct">FLEX YOUR FOREARM TO JUMP</div>
+        </div>
+
+        <!-- Live EMG waveform -->
+        <div class="waveform-section">
+          <canvas id="wave-canvas" height="60"></canvas>
+          <div class="wave-label">LIVE EMG TRACE</div>
+        </div>
+
+        <!-- Stats row -->
+        <div class="flex-stats">
+          <div class="fstat">
+            <span class="fstat-val" id="fs-peak">0 mV</span>
+            <span class="fstat-lbl">PEAK THIS ATTEMPT</span>
+          </div>
+          <div class="fstat">
+            <span class="fstat-val accent" id="fs-target">— mV</span>
+            <span class="fstat-lbl">TARGET THRESHOLD</span>
+          </div>
+          <div class="fstat">
+            <span class="fstat-val warn" id="fs-attempts">1</span>
+            <span class="fstat-lbl">TOTAL ATTEMPTS</span>
+          </div>
+          <div class="fstat">
+            <span class="fstat-val" id="fs-channel">CH?</span>
+            <span class="fstat-lbl">EMG CHANNEL</span>
+          </div>
+        </div>
+
       </div>
-
-      <!-- Large EMG power bar -->
-      <div class="power-section">
-        <div class="power-labels">
-          <span class="power-lbl-left">REST</span>
-          <span class="power-lbl-right" id="power-lbl-right">TARGET (— mV)</span>
-        </div>
-        <div class="power-bar-outer">
-          <div class="power-bar-fill" id="power-bar-fill"></div>
-          <div class="power-threshold-line" id="power-thr-line"></div>
-        </div>
-        <div class="power-rms-display" id="power-rms-display">0 mV</div>
-        <div class="power-instruct" id="power-instruct">FLEX YOUR FOREARM TO JUMP</div>
-      </div>
-
-      <!-- Live EMG waveform -->
-      <div class="waveform-section">
-        <canvas id="wave-canvas" height="60"></canvas>
-        <div class="wave-label">LIVE EMG TRACE</div>
-      </div>
-
-      <!-- Stats row -->
-      <div class="flex-stats">
-        <div class="fstat">
-          <span class="fstat-val" id="fs-peak">0 mV</span>
-          <span class="fstat-lbl">PEAK THIS ATTEMPT</span>
-        </div>
-        <div class="fstat">
-          <span class="fstat-val accent" id="fs-target">— mV</span>
-          <span class="fstat-lbl">TARGET THRESHOLD</span>
-        </div>
-        <div class="fstat">
-          <span class="fstat-val warn" id="fs-attempts">1</span>
-          <span class="fstat-lbl">TOTAL ATTEMPTS</span>
-        </div>
-        <div class="fstat">
-          <span class="fstat-val" id="fs-channel">CH?</span>
-          <span class="fstat-lbl">EMG CHANNEL</span>
-        </div>
-      </div>
-
     </div>
-  </div>
 
-  <!-- ═══════════════════════════════════════════
+    <!-- ═══════════════════════════════════════════
        RESULTS OVERLAY
   ═══════════════════════════════════════════ -->
-  <div class="overlay hidden" id="results-overlay">
-    <div class="panel results-panel">
+    <div class="overlay hidden" id="results-overlay">
+      <div class="panel results-panel">
 
-      <div class="panel-header">
-        <div class="brand-logo">Session <span class="accent">Complete</span></div>
-        <div class="brand-sub" id="results-sid"></div>
+        <div class="panel-header">
+          <div class="brand-logo">Session <span class="accent">Complete</span></div>
+          <div class="brand-sub" id="results-sid"></div>
+        </div>
+
+        <!-- Summary cards -->
+        <div class="results-summary" id="results-summary"></div>
+
+        <!-- Per-hurdle table -->
+        <div class="results-table-wrap">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Attempts</th>
+                <th>Cleared at</th>
+                <th>Peak EMG (mV)</th>
+                <th>Target (mV)</th>
+                <th>Time-to-act (ms)</th>
+                <th>Efficiency</th>
+              </tr>
+            </thead>
+            <tbody id="results-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="results-actions">
+          <button class="btn-primary small" id="export-btn">📥 Export Protocol JSON</button>
+          <button class="btn-secondary small" id="export-attempts-btn">📊 Export Attempts CSV</button>
+          <button class="btn-secondary small" id="export-emg-filtered-btn">↓ EMG Filtered CSV</button>
+          <button class="btn-secondary small" id="export-emg-raw-btn">↓ EMG Raw CSV</button>
+          <button class="btn-secondary small" id="game-alignment-btn">📊 Alignment %</button>
+          <button class="btn-secondary small" id="new-session-btn">New Protocol</button>
+          <a href="/" class="btn-ghost small">← Monitor</a>
+        </div>
+
       </div>
+    </div>
 
-      <!-- Summary cards -->
-      <div class="results-summary" id="results-summary"></div>
+  </div><!-- #app -->
 
-      <!-- Per-hurdle table -->
-      <div class="results-table-wrap">
-        <table class="results-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Attempts</th>
-              <th>Cleared at</th>
-              <th>Peak EMG (mV)</th>
-              <th>Target (mV)</th>
-              <th>Time-to-act (ms)</th>
-              <th>Efficiency</th>
-            </tr>
-          </thead>
-          <tbody id="results-tbody"></tbody>
-        </table>
+  <!-- ── Alignment Analysis Modal ── -->
+  <div id="align-modal"
+    style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;"
+    role="dialog" aria-modal="true" aria-labelledby="align-modal-title">
+    <div
+      style="background:#1b2030;border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:24px;width:min(480px, 94vw);box-shadow:0 12px 36px rgba(0,0,0,0.5);color:#e8ecf4;font-family:sans-serif;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <h2 id="align-modal-title" style="margin:0;font-size:1.2rem;font-weight:700;color:#e8ecf4;">📊 Data Alignment
+          Analysis</h2>
+        <button id="align-modal-close"
+          style="background:none;border:none;color:#6b7590;font-size:1.4rem;cursor:pointer;line-height:1;"
+          aria-label="Close">&times;</button>
       </div>
-
-      <div class="results-actions">
-        <button class="btn-primary small" id="export-btn">📥 Export Protocol JSON</button>
-        <button class="btn-secondary small" id="export-attempts-btn">📊 Export Attempts CSV</button>
-        <button class="btn-secondary small" id="export-emg-filtered-btn">↓ EMG Filtered CSV</button>
-        <button class="btn-secondary small" id="export-emg-raw-btn">↓ EMG Raw CSV</button>
-        <button class="btn-secondary small" id="game-alignment-btn">📊 Alignment %</button>
-        <button class="btn-secondary small" id="new-session-btn">New Protocol</button>
-        <a href="/" class="btn-ghost small">← Monitor</a>
-      </div>
-
+      <div id="align-modal-body"></div>
     </div>
   </div>
 
-</div><!-- #app -->
-
-<!-- ── Alignment Analysis Modal ── -->
-<div id="align-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;" role="dialog" aria-modal="true" aria-labelledby="align-modal-title">
-  <div style="background:#1b2030;border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:24px;width:min(480px, 94vw);box-shadow:0 12px 36px rgba(0,0,0,0.5);color:#e8ecf4;font-family:sans-serif;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-      <h2 id="align-modal-title" style="margin:0;font-size:1.2rem;font-weight:700;color:#e8ecf4;">📊 Data Alignment Analysis</h2>
-      <button id="align-modal-close" style="background:none;border:none;color:#6b7590;font-size:1.4rem;cursor:pointer;line-height:1;" aria-label="Close">&times;</button>
-    </div>
-    <div id="align-modal-body"></div>
-  </div>
-</div>
-
-<script src="emg-engine.js"></script>
-<script src="serial-web.js"></script>
-<script src="game-state.js"></script>
-<script src="game-renderer.js"></script>
-<script src="game-logic.js"></script>
-<script src="game-ui.js"></script>
+  <script src="emg-engine.js"></script>
+  <script src="serial-web.js"></script>
+  <script src="game-state.js"></script>
+  <script src="game-renderer.js"></script>
+  <script src="game-logic.js"></script>
+  <script src="game-ui.js"></script>
 </body>
+
 </html>

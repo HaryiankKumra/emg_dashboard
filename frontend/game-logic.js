@@ -23,7 +23,7 @@ function gameLoop(ts) {
 function startLoop() {
   if (rafId) cancelAnimationFrame(rafId);
   lastTs = null;
-  rafId  = requestAnimationFrame(gameLoop);
+  rafId = requestAnimationFrame(gameLoop);
 }
 
 // ── State Machine Update ──────────────────────────────
@@ -58,7 +58,7 @@ function updateApproach(dt) {
 
   GAME.approachT += dt;
   var t = Math.min(GAME.approachT / GAME.approachDur, 1);
-  t = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; // Ease in-out
+  t = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // Ease in-out
 
   GAME.charFrac = lerp(GAME.approachStartFrac, GAME.approachTargetFrac, t);
 
@@ -73,7 +73,7 @@ function updateResting(dt) {
   // Cap relax threshold at 75% of target flex threshold so relaxed < jump trigger is always true
   relaxThreshold = Math.min(relaxThreshold, SESSION.threshold * 0.75);
   var currentRms = Math.round(EMG.rms);
-  
+
   if (GAME.restTimer > 0) {
     // Mandatory rest countdown — player cannot do anything yet
     GAME.restTimer -= dt;
@@ -167,9 +167,9 @@ function updateAtHurdle(dt) {
 }
 
 function updatePowerBar() {
-  var rms  = EMG.rms;
-  var thr  = SESSION.threshold;
-  var pct  = Math.min(rms / 300 * 100, 100);
+  var rms = EMG.rms;
+  var thr = SESSION.threshold;
+  var pct = Math.min(rms / 300 * 100, 100);
   var fill = $('power-bar-fill');
   if (!fill) return;
 
@@ -207,11 +207,11 @@ function updateCountdownRing(frac) {
 function updateJump(dt) {
   var grav = 1900;
   GAME.charVy += grav * dt;
-  GAME.charY  += GAME.charVy * dt;
+  GAME.charY += GAME.charVy * dt;
   GAME.charFrac += 0.7 * dt * (1 / (SESSION.numHurdles + 1));
 
   if (GAME.charY >= 0) {
-    GAME.charY  = 0;
+    GAME.charY = 0;
     GAME.charVy = 0;
     onLanded();
   }
@@ -233,7 +233,7 @@ function updateHit(dt) {
 function beginApproach(hurdleIndex) {
   GAME.phase = 'approaching';
   GAME.approachT = 0;
-  GAME.approachStartFrac  = GAME.charFrac;
+  GAME.approachStartFrac = GAME.charFrac;
   GAME.approachTargetFrac = hurdleFrac(hurdleIndex) - 0.018;
   GAME.approachTargetFrac = Math.max(GAME.charFrac, GAME.approachTargetFrac);
   earlyFlexHeld = 0;
@@ -290,7 +290,7 @@ function triggerHit() {
 
   hideFlexOverlay();
 
-  shake.t   = 0.35;
+  shake.t = 0.35;
   shake.mag = 10;
 
   var hx = W * TRACK_L_FRAC + W * (TRACK_R_FRAC - TRACK_L_FRAC) * hurdleFrac(GAME.currentHurdle);
@@ -323,12 +323,12 @@ function beginRestPhase(tooEarly) {
   earlyFlexHeld = 0;       // Reset early flex timer
   restTooEarly = !!tooEarly;
   showOverlay('cd-overlay');
-  
+
   if (restInterval) {
     clearInterval(restInterval);
     restInterval = null;
   }
-  
+
   $('cd-big').textContent = '2 s';
   if (tooEarly) {
     $('cd-sub').textContent = '⚠️ TOO EARLY! RELAX YOUR MUSCLE';
@@ -344,7 +344,7 @@ function beginReadyPhase() {
   GAME.readyTimer = 1.0; // Ready countdown timer
   earlyFlexHeld = 0;      // Reset early flex timer
   restTooEarly = false;   // Reset warning state
-  
+
   $('cd-big').textContent = '1';
   if (GAME.currentHurdle === 0) {
     $('cd-sub').textContent = 'GET READY FOR HURDLE 1';
@@ -363,12 +363,12 @@ function resetToSetup() {
     clearInterval(calibInterval);
     calibInterval = null;
   }
-  
+
   // Wipe session data caches
   if (typeof EmgEngine !== 'undefined') {
     EmgEngine.clearAllData();
   }
-  
+
   GAME.relaxTimeHeld = 0;
   earlyFlexHeld = 0;
   restTooEarly = false;
@@ -382,7 +382,7 @@ function resetToSetup() {
 
 // ── Overlay management helper ────────────────────────
 function showOverlay(id) {
-  ALL_OVERLAYS.forEach(function(oid) {
+  ALL_OVERLAYS.forEach(function (oid) {
     var el = $(oid);
     if (el) el.classList.toggle('hidden', oid !== id);
   });
@@ -395,7 +395,7 @@ function hideOverlay(id) {
 }
 
 function hideAllOverlays() {
-  ALL_OVERLAYS.forEach(function(id) {
+  ALL_OVERLAYS.forEach(function (id) {
     var el = $(id);
     if (el) el.classList.add('hidden');
   });
@@ -406,16 +406,16 @@ function showFlexOverlay() {
   $('flex-overlay').classList.remove('hidden');
   updateCachedDimensions();
 
-  $('flex-hurdle-id').textContent      = 'HURDLE ' + (GAME.currentHurdle + 1) + ' / ' + SESSION.numHurdles;
-  $('flex-attempt-badge').textContent  = 'ATTEMPT ' + GAME.totalAttemptsThisHurdle;
-  $('power-lbl-right').textContent     = 'TARGET (' + Math.round(SESSION.threshold) + ' mV)';
-  $('fs-target').textContent           = Math.round(SESSION.threshold) + ' mV';
-  $('fs-attempts').textContent         = GAME.totalAttemptsThisHurdle;
-  $('fs-peak').textContent             = '0 mV';
-  $('fs-channel').textContent          = 'CH' + EMG.channel;
-  $('power-rms-display').textContent   = '0 mV';
-  $('power-instruct').textContent      = 'FLEX YOUR FOREARM TO JUMP';
-  $('power-instruct').className        = 'power-instruct';
+  $('flex-hurdle-id').textContent = 'HURDLE ' + (GAME.currentHurdle + 1) + ' / ' + SESSION.numHurdles;
+  $('flex-attempt-badge').textContent = 'ATTEMPT ' + GAME.totalAttemptsThisHurdle;
+  $('power-lbl-right').textContent = 'TARGET (' + Math.round(SESSION.threshold) + ' mV)';
+  $('fs-target').textContent = Math.round(SESSION.threshold) + ' mV';
+  $('fs-attempts').textContent = GAME.totalAttemptsThisHurdle;
+  $('fs-peak').textContent = '0 mV';
+  $('fs-channel').textContent = 'CH' + EMG.channel;
+  $('power-rms-display').textContent = '0 mV';
+  $('power-instruct').textContent = 'FLEX YOUR FOREARM TO JUMP';
+  $('power-instruct').className = 'power-instruct';
 
   var tPct = Math.min(SESSION.threshold / 300 * 100, 96);
   $('power-thr-line').style.left = tPct + '%';
@@ -437,16 +437,16 @@ var calibBase = 0;
 var calibPhase = 'idle'; // idle | relax | flex
 
 function startSampleFlex() {
-  calibPhase   = 'relax';
+  calibPhase = 'relax';
   calibSamples = [];
   calibElapsed = 0;
-  calibBase    = 0;
+  calibBase = 0;
 
   showOverlay('calib-overlay');
   $('calib-phase-label').textContent = 'PHASE 1 / 2 — BASELINE';
-  $('calib-instr').textContent       = '🧘 Relax your forearm completely…';
-  $('calib-count').textContent       = '3';
-  $('calib-note').textContent        = 'Recording resting baseline…';
+  $('calib-instr').textContent = '🧘 Relax your forearm completely…';
+  $('calib-count').textContent = '3';
+  $('calib-note').textContent = 'Recording resting baseline…';
 
   $('setup-live-wrap').classList.remove('hidden');
   startLoop();
@@ -461,30 +461,30 @@ function tickCalib() {
   calibSamples.push(rms);
 
   var pct = Math.min(rms / 300 * 100, 100);
-  $('calib-bar-fg').style.width  = pct + '%';
+  $('calib-bar-fg').style.width = pct + '%';
   $('calib-bar-rms').textContent = Math.round(rms) + ' mV';
   $('setup-live-fg').style.width = pct + '%';
   $('setup-live-rms').textContent = Math.round(rms) + ' mV';
 
   var total = calibPhase === 'relax' ? 3 : 3.5;
-  var rem   = Math.max(0, Math.ceil(total - calibElapsed));
+  var rem = Math.max(0, Math.ceil(total - calibElapsed));
   $('calib-count').textContent = rem;
 
   if (calibElapsed >= total) {
     if (calibPhase === 'relax') {
-      calibBase = calibSamples.reduce(function(s,v){return s+v;},0) / calibSamples.length;
+      calibBase = calibSamples.reduce(function (s, v) { return s + v; }, 0) / calibSamples.length;
       SESSION.baseline = calibBase;
       calibSamples = [];
       calibElapsed = 0;
-      calibPhase   = 'flex';
+      calibPhase = 'flex';
 
       $('calib-phase-label').textContent = 'PHASE 2 / 2 — TARGET FLEX';
-      $('calib-instr').textContent       = '💪 Flex at your DESIRED effort level and hold it!';
-      $('calib-count').textContent       = '3';
-      $('calib-note').textContent        = 'Recording your target strength…';
+      $('calib-instr').textContent = '💪 Flex at your DESIRED effort level and hold it!';
+      $('calib-count').textContent = '3';
+      $('calib-note').textContent = 'Recording your target strength…';
     } else {
       var peakFlex = Math.max.apply(null, calibSamples);
-      SESSION.threshold  = Math.max(calibBase + 5, peakFlex * 0.85);
+      SESSION.threshold = Math.max(calibBase + 5, peakFlex * 0.85);
       SESSION.calibrated = true;
 
       if (calibInterval) {
@@ -513,8 +513,8 @@ function skipCalib() {
     rafId = null;
   }
   calibPhase = 'idle';
-  SESSION.threshold  = 30;
-  SESSION.baseline   = 4;
+  SESSION.threshold = 30;
+  SESSION.baseline = 4;
   SESSION.calibrated = true;
 
   showOverlay('setup-overlay');
@@ -526,15 +526,15 @@ function skipCalib() {
 // ── Session start / execution ────────────────────────
 function startProtocol() {
   var meta = readGameSessionMeta();
-  SESSION.participantName  = meta.participant;
-  SESSION.sex            = meta.sex;
-  SESSION.age            = meta.age;
-  SESSION.weight_kg      = meta.weight_kg;
-  SESSION.height_cm      = meta.height_cm;
-  SESSION.exercise       = meta.exercise;
-  SESSION.trial_no       = meta.trial_no;
-  SESSION.targetLimb     = meta.targetLimb;
-  SESSION.numHurdles       = parseInt($('inp-hurdles').value);
+  SESSION.participantName = meta.participant;
+  SESSION.sex = meta.sex;
+  SESSION.age = meta.age;
+  SESSION.weight_kg = meta.weight_kg;
+  SESSION.height_cm = meta.height_cm;
+  SESSION.exercise = meta.exercise;
+  SESSION.trial_no = meta.trial_no;
+  SESSION.targetLimb = meta.targetLimb;
+  SESSION.numHurdles = parseInt($('inp-hurdles').value);
   SESSION.attemptTimeLimit = parseInt($('inp-timelimit').value);
 
   var ts = new Date();
@@ -548,13 +548,13 @@ function startProtocol() {
 
   GAME.phase = 'setup';
   GAME.currentHurdle = 0;
-  GAME.charFrac  = 0;
-  GAME.charY     = 0;
-  GAME.charVy    = 0;
+  GAME.charFrac = 0;
+  GAME.charY = 0;
+  GAME.charVy = 0;
   GAME.charAnimT = 0;
   GAME.totalAttemptsThisHurdle = 0;
   HURDLE_LOG.length = 0;
-  particles.length  = 0;
+  particles.length = 0;
   waveHistories = { 1: [], 2: [], 3: [], 4: [] };
   waveHistoryCombined = [];
 
@@ -564,7 +564,7 @@ function startProtocol() {
   }
 
   hideOverlay('setup-overlay');
-  
+
   // Start session recording and start directly with the rest phase
   sessionStartTime = Date.now();
   startGameEMGRecording();
@@ -582,17 +582,17 @@ function completeSession() {
 
 // ── Results View & File Exports ──────────────────────
 function buildResults() {
-  var totalAttempts = HURDLE_LOG.reduce(function(s, h) { return s + (h ? h.attempts.length : 0); }, 0);
+  var totalAttempts = HURDLE_LOG.reduce(function (s, h) { return s + (h ? h.attempts.length : 0); }, 0);
   var totalTime = (Date.now() - sessionStartTime) / 1000;
   var efficiency = ((SESSION.numHurdles / Math.max(totalAttempts, 1)) * 100).toFixed(1);
 
-  var peaks = HURDLE_LOG.map(function(h) {
+  var peaks = HURDLE_LOG.map(function (h) {
     if (!h) return 0;
-    var s = h.attempts.find(function(a) { return a.outcome === 'success'; });
+    var s = h.attempts.find(function (a) { return a.outcome === 'success'; });
     return s ? s.peakEMG_mV : 0;
   });
   var avgPeak = peaks.length > 0
-    ? peaks.reduce(function(s, v) { return s + v; }, 0) / peaks.length
+    ? peaks.reduce(function (s, v) { return s + v; }, 0) / peaks.length
     : 0;
 
   $('results-sid').textContent = 'SESSION · ' + SESSION.sessionId;
@@ -615,14 +615,14 @@ function buildResults() {
   for (var i = 0; i < SESSION.numHurdles; i++) {
     var h = HURDLE_LOG[i];
     if (!h) continue;
-    var nattempts  = h.attempts.length;
-    var success    = h.attempts.find(function(a) { return a.outcome === 'success'; });
-    var peakEMG    = success ? Math.round(success.peakEMG_mV) : '—';
-    var timeToAct  = success && success.timeToThreshold_ms != null
+    var nattempts = h.attempts.length;
+    var success = h.attempts.find(function (a) { return a.outcome === 'success'; });
+    var peakEMG = success ? Math.round(success.peakEMG_mV) : '—';
+    var timeToAct = success && success.timeToThreshold_ms != null
       ? Math.round(success.timeToThreshold_ms) : '—';
-    var clearedAt  = h.completedAt ? (h.completedAt / 1000).toFixed(1) + 's' : '—';
-    var effTxt     = nattempts === 1 ? '✓ First try' : nattempts + ' attempts';
-    var effCls     = nattempts === 1 ? 'good' : nattempts > 3 ? 'warn' : '';
+    var clearedAt = h.completedAt ? (h.completedAt / 1000).toFixed(1) + 's' : '—';
+    var effTxt = nattempts === 1 ? '✓ First try' : nattempts + ' attempts';
+    var effCls = nattempts === 1 ? 'good' : nattempts > 3 ? 'warn' : '';
 
     var tr = document.createElement('tr');
     tr.innerHTML =
@@ -650,80 +650,80 @@ function makeAttemptRecord(outcome) {
   var trace = waveHistoryCombined.slice();
   var meanEMG = 0;
   if (trace.length) {
-    meanEMG = trace.reduce(function(s, v) { return s + v; }, 0) / trace.length;
+    meanEMG = trace.reduce(function (s, v) { return s + v; }, 0) / trace.length;
   }
   return {
-    startTime_ms:        GAME.currentAttemptStart - sessionStartTime,
-    endTime_ms:          now - sessionStartTime,
-    duration_ms:         duration,
-    outcome:             outcome,
-    peakEMG_mV:          round2(GAME.currentPeakEMG),
-    meanEMG_mV:          round2(meanEMG),
-    timeToThreshold_ms:  outcome === 'success' ? duration : null,
-    channel:             EMG.channel,
-    threshold_mV:        round2(SESSION.threshold),
-    baseline_mV:         round2(SESSION.baseline),
-    emg_trace_hz:        trace.length && duration > 0
+    startTime_ms: GAME.currentAttemptStart - sessionStartTime,
+    endTime_ms: now - sessionStartTime,
+    duration_ms: duration,
+    outcome: outcome,
+    peakEMG_mV: round2(GAME.currentPeakEMG),
+    meanEMG_mV: round2(meanEMG),
+    timeToThreshold_ms: outcome === 'success' ? duration : null,
+    channel: EMG.channel,
+    threshold_mV: round2(SESSION.threshold),
+    baseline_mV: round2(SESSION.baseline),
+    emg_trace_hz: trace.length && duration > 0
       ? round2(trace.length / (duration / 1000))
       : null,
-    emg_trace_mV:        trace,
+    emg_trace_mV: trace,
   };
 }
 
 function exportJSON() {
-  var totalAttempts = HURDLE_LOG.reduce(function(s, h) { return s + (h ? h.attempts.length : 0); }, 0);
+  var totalAttempts = HURDLE_LOG.reduce(function (s, h) { return s + (h ? h.attempts.length : 0); }, 0);
   var totalTime = (Date.now() - sessionStartTime) / 1000;
 
   var data = {
     schema_version: '2.0',
-    sessionId:       SESSION.sessionId,
-    timestamp:       new Date().toISOString(),
+    sessionId: SESSION.sessionId,
+    timestamp: new Date().toISOString(),
     participant: {
-      id:          SESSION.participantName || 'anonymous',
-      sex:         SESSION.sex,
-      age:         SESSION.age,
-      weight_kg:     SESSION.weight_kg,
-      height_cm:     SESSION.height_cm,
+      id: SESSION.participantName || 'anonymous',
+      sex: SESSION.sex,
+      age: SESSION.age,
+      weight_kg: SESSION.weight_kg,
+      height_cm: SESSION.height_cm,
     },
     protocol: {
-      exercise:            SESSION.exercise,
-      trial_no:            SESSION.trial_no,
-      numHurdles:          SESSION.numHurdles,
-      attemptTimeLimit_s:  SESSION.attemptTimeLimit,
-      threshold_mV:        round2(SESSION.threshold),
-      baseline_mV:         round2(SESSION.baseline),
-      hurdleVisualH_px:    Math.round(hurdleVisualH()),
+      exercise: SESSION.exercise,
+      trial_no: SESSION.trial_no,
+      numHurdles: SESSION.numHurdles,
+      attemptTimeLimit_s: SESSION.attemptTimeLimit,
+      threshold_mV: round2(SESSION.threshold),
+      baseline_mV: round2(SESSION.baseline),
+      hurdleVisualH_px: Math.round(hurdleVisualH()),
     },
     emg_recording: {
-      sample_count:      EmgEngine.recorder ? EmgEngine.recorder.sampleCount : 0,
+      sample_count: EmgEngine.recorder ? EmgEngine.recorder.sampleCount : 0,
       session_timestamp: EmgEngine.recorder ? EmgEngine.recorder.getMeta().session_timestamp : null,
     },
     summary: {
-      totalAttempts:   totalAttempts,
-      totalTime_s:     round2(totalTime),
-      efficiency_pct:  round2((SESSION.numHurdles / Math.max(totalAttempts, 1)) * 100),
+      totalAttempts: totalAttempts,
+      totalTime_s: round2(totalTime),
+      efficiency_pct: round2((SESSION.numHurdles / Math.max(totalAttempts, 1)) * 100),
     },
-    hurdles: HURDLE_LOG.map(function(h, i) {
+    hurdles: HURDLE_LOG.map(function (h, i) {
       if (!h) return null;
       return {
-        hurdle:         i + 1,
-        totalAttempts:  h.attempts.length,
+        hurdle: i + 1,
+        totalAttempts: h.attempts.length,
         completedAt_ms: h.completedAt,
-        attempts: h.attempts.map(function(a, idx) {
+        attempts: h.attempts.map(function (a, idx) {
           return {
-            attempt_no:          idx + 1,
-            outcome:             a.outcome,
-            startTime_ms:        a.startTime_ms,
-            endTime_ms:          a.endTime_ms,
-            duration_ms:         a.duration_ms,
-            peakEMG_mV:          a.peakEMG_mV,
-            meanEMG_mV:          a.meanEMG_mV,
-            timeToThreshold_ms:  a.timeToThreshold_ms,
-            channel:             a.channel,
-            threshold_mV:        a.threshold_mV,
-            baseline_mV:         a.baseline_mV,
-            emg_trace_hz:        a.emg_trace_hz,
-            emg_trace_mV:        a.emg_trace_mV,
+            attempt_no: idx + 1,
+            outcome: a.outcome,
+            startTime_ms: a.startTime_ms,
+            endTime_ms: a.endTime_ms,
+            duration_ms: a.duration_ms,
+            peakEMG_mV: a.peakEMG_mV,
+            meanEMG_mV: a.meanEMG_mV,
+            timeToThreshold_ms: a.timeToThreshold_ms,
+            channel: a.channel,
+            threshold_mV: a.threshold_mV,
+            baseline_mV: a.baseline_mV,
+            emg_trace_hz: a.emg_trace_hz,
+            emg_trace_mV: a.emg_trace_mV,
           };
         }),
       };
@@ -731,8 +731,8 @@ function exportJSON() {
   };
 
   var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  var url  = URL.createObjectURL(blob);
-  var a    = document.createElement('a');
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
   a.href = url;
   a.download = SESSION.participantName + '_trial' + SESSION.trial_no + '_' + SESSION.exercise + '_protocol.json';
   document.body.appendChild(a);
@@ -749,9 +749,9 @@ function exportAttemptsCSV() {
   ];
   var rows = [header.join(',')];
 
-  HURDLE_LOG.forEach(function(h, hi) {
+  HURDLE_LOG.forEach(function (h, hi) {
     if (!h) return;
-    h.attempts.forEach(function(a, ai) {
+    h.attempts.forEach(function (a, ai) {
       rows.push([
         SESSION.participantName,
         SESSION.sex,
@@ -820,7 +820,7 @@ function connectEMG() {
   window.addEventListener('emg-update', onEmgUpdate);
 
   if (typeof SerialWeb !== 'undefined' && SerialWeb.isSupported()) {
-    SerialWeb.reconnectGranted(921600).then(function(ok) {
+    SerialWeb.reconnectGranted(921600).then(function (ok) {
       if (ok) {
         $('ws-dot').className = 'on';
         $('ws-lbl').textContent = 'EMG LINKED';
@@ -835,31 +835,31 @@ function onEmgUpdate(ev) {
 
   lastEmgMsg = msg; // Render wave graphs
 
-  var live = msg.channels.filter(function(c) { return (c.sample_rate || 0) > 0; });
+  var live = msg.channels.filter(function (c) { return (c.sample_rate || 0) > 0; });
   var pool = live.length > 0 ? live : msg.channels;
 
   var activeChs = SESSION.activeChannels || [1];
   if (activeChs.length === 1 && activeChs[0] === 0) {
-    var chosen = pool.reduce(function(b, c) { return (c.rms || 0) > (b.rms || 0) ? c : b; }, pool[0]);
+    var chosen = pool.reduce(function (b, c) { return (c.rms || 0) > (b.rms || 0) ? c : b; }, pool[0]);
     EMG.rms = chosen.rms || 0;
     EMG.channel = chosen.ch || '?';
   } else {
-    var targetChannels = msg.channels.filter(function(c) { return activeChs.indexOf(c.ch) !== -1; });
+    var targetChannels = msg.channels.filter(function (c) { return activeChs.indexOf(c.ch) !== -1; });
     if (targetChannels.length === 0) {
       targetChannels = [pool[0]];
     }
-    
-    var rmsValues = targetChannels.map(function(c) { return c.rms || 0; });
+
+    var rmsValues = targetChannels.map(function (c) { return c.rms || 0; });
     var combVal = 0;
     if (SESSION.combMode === 'max') {
       combVal = Math.max.apply(null, rmsValues);
     } else if (SESSION.combMode === 'min') {
       combVal = Math.min.apply(null, rmsValues);
     } else {
-      var sum = rmsValues.reduce(function(a, b) { return a + b; }, 0);
+      var sum = rmsValues.reduce(function (a, b) { return a + b; }, 0);
       combVal = sum / rmsValues.length;
     }
-    
+
     EMG.rms = combVal;
     EMG.channel = activeChs.join('+');
   }
@@ -876,7 +876,7 @@ function onEmgUpdate(ev) {
   var preview = $('ch-live-preview');
   if (preview) {
     var rmsVal = Math.round(EMG.rms);
-    var label = activeChs.map(function(c) { return c === 0 ? 'AUTO' : 'CH' + c; }).join('+');
+    var label = activeChs.map(function (c) { return c === 0 ? 'AUTO' : 'CH' + c; }).join('+');
     if (activeChs.length > 1) {
       label += ' (' + SESSION.combMode.toUpperCase() + ')';
     }

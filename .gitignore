@@ -7,3 +7,6 @@ backend/venv/
 *.egg-info/
 resume.tex
 
+dataset/
+dataset2/
+dat3/

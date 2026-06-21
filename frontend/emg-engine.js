@@ -34,6 +34,7 @@ const RESEARCH = {
     { value: 'leg_press',      label: 'Leg Press' },
     { value: 'squats',         label: 'Squats' },
     { value: 'jumping',        label: 'Jumping' },
+    { value: 'cycling',        label: 'Cycling' },
   ],
   TRIALS: [1, 2, 3, 4, 5],
   SEX_OPTIONS: [

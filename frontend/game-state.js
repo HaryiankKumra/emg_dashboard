@@ -118,7 +118,8 @@ var LIMB_EXERCISES = {
     { value: 'lunges', label: 'Lunges' },
     { value: 'leg_press', label: 'Leg Press' },
     { value: 'squats', label: 'Squats' },
-    { value: 'jumping', label: 'Jumping' }
+    { value: 'jumping', label: 'Jumping' },
+    { value: 'cycling', label: 'Cycling' }
   ],
   arm: [
     { value: 'bicep_curl', label: 'Bicep Curl', selected: true },

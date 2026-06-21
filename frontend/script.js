@@ -42,9 +42,7 @@ const dom = {
   recLabelDisplay: $('rec-label-display'),
   recStartBtn: $('rec-start-btn'),
   recStopBtn: $('rec-stop-btn'),
-  downloadBtn: $('download-btn'),
-  downloadRawBtn: $('download-raw-btn'),
-  downloadLongBtn: $('download-long-btn'),
+  downloadAllBtn: $('download-all-btn'),
   connStatus: $('conn-status'),
   statusDot: $('status-dot'),
   statusText: $('status-text'),
@@ -321,9 +319,7 @@ function startRecording() {
     'success', 4000
   );
   state.hasData = false;
-  dom.downloadBtn.disabled = true;
-  dom.downloadRawBtn.disabled = true;
-  dom.downloadLongBtn.disabled = true;
+  dom.downloadAllBtn.disabled = true;
 }
 
 function stopRecording() {
@@ -344,27 +340,54 @@ function stopRecording() {
   }
   toast(msg, 'success', 6000);
   state.hasData = n > 0;
-  dom.downloadBtn.disabled = !state.hasData;
-  dom.downloadRawBtn.disabled = !state.hasData;
-  dom.downloadLongBtn.disabled = !state.hasData;
+  dom.downloadAllBtn.disabled = !state.hasData;
 }
 
-function downloadCSV(filtered = true) {
-  const ok = EmgEngine.downloadRecorderCSV(filtered);
-  if (!ok) {
+function downloadAllAndAnalyze() {
+  if (!state.hasData || EmgEngine.recorder.sampleCount === 0) {
     toast('No data to download.', 'warning');
     return;
   }
-  toast(filtered ? 'Time-aligned filtered CSV downloaded.' : 'Time-aligned raw CSV downloaded.', 'success');
-}
+  
+  // Download all 3 formats
+  EmgEngine.downloadRecorderCSV(true);
+  EmgEngine.downloadRecorderCSV(false);
+  EmgEngine.downloadRecorderLongCSV(true);
+  toast('All 3 CSV files downloaded.', 'success');
 
-function downloadLongCSV() {
-  const ok = EmgEngine.downloadRecorderLongCSV(true);
-  if (!ok) {
-    toast('No data to download.', 'warning');
-    return;
+  // Trigger analysis popup
+  const stats = EmgEngine.recorder.getAlignmentStats();
+  if (!stats) return;
+
+  const modal = document.getElementById('analyzer-modal');
+  const body = document.getElementById('analyzer-modal-body');
+  if (modal && body) {
+    let html = `<p style="margin-bottom:12px;"><strong>Alignment Analysis Complete:</strong></p>`;
+    html += `<div style="background:rgba(0,0,0,0.2);padding:12px;border-radius:8px;margin-bottom:12px;">`;
+    html += `<div style="font-size:2rem;font-weight:bold;color:${stats.alignedPct > 95 ? '#00e5a0' : '#ff4d4d'};text-align:center;margin-bottom:8px;">${stats.alignedPct}% Aligned</div>`;
+    html += `<div><strong>Total Time Frames:</strong> ${stats.totalFrames}</div>`;
+    html += `<div><strong>Aligned Frames:</strong> ${stats.alignedFrames}</div>`;
+    html += `<div><strong>Session Duration:</strong> ${stats.durationS} s</div>`;
+    html += `</div>`;
+    
+    html += `<p style="font-size:0.8rem;color:#a0aec0;margin-bottom:8px;"><strong>Channels Active:</strong> ${stats.active.join(', ')}</p>`;
+    
+    // Add per channel stats
+    if (stats.perChannel) {
+      html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">`;
+      for (const ch of stats.active) {
+        const pch = stats.perChannel[ch];
+        html += `<div style="background:rgba(255,255,255,0.05);padding:8px;border-radius:6px;flex:1;min-width:100px;text-align:center;">`;
+        html += `<div style="font-size:0.75rem;color:#cbd5e1;margin-bottom:4px;">CH ${ch} Coverage</div>`;
+        html += `<div style="font-weight:bold;font-size:1.1rem;color:#fff;">${pch.coveragePct}%</div>`;
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+
+    body.innerHTML = html;
+    modal.style.display = 'flex';
   }
-  toast('Long-format CSV downloaded (every sample, no alignment).', 'success');
 }
 
 function toggleFilter() {
@@ -426,9 +449,7 @@ dom.disconnectBtn.addEventListener('click', disconnectSerial);
 dom.filterBtn.addEventListener('click', toggleFilter);
 dom.recStartBtn.addEventListener('click', startRecording);
 dom.recStopBtn.addEventListener('click', stopRecording);
-dom.downloadBtn.addEventListener('click', () => downloadCSV(true));
-dom.downloadRawBtn.addEventListener('click', () => downloadCSV(false));
-dom.downloadLongBtn.addEventListener('click', downloadLongCSV);
+dom.downloadAllBtn.addEventListener('click', downloadAllAndAnalyze);
 
 window.addEventListener('emg-update', onEmgUpdate);
 

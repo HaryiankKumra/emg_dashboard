@@ -185,15 +185,8 @@
         <button id="rec-stop-btn" class="btn btn-record-stop hidden" aria-label="Stop recording">
           <span class="btn-icon">⏹</span> Stop
         </button>
-        <button id="download-btn" class="btn btn-download" disabled aria-label="Download time-aligned filtered CSV">
-          <span class="btn-icon">↓</span> Aligned (Filt)
-        </button>
-        <button id="download-raw-btn" class="btn btn-download-raw" disabled aria-label="Download time-aligned raw CSV">
-          <span class="btn-icon">↓</span> Aligned (Raw)
-        </button>
-        <button id="download-long-btn" class="btn btn-download" disabled aria-label="Download long-format CSV"
-          title="One row per sample — best for IEEE analysis">
-          <span class="btn-icon">↓</span> Long CSV
+        <button id="download-all-btn" class="btn btn-download" disabled aria-label="Download all CSV formats and analyze">
+          <span class="btn-icon">📥</span> Download & Analyze
         </button>
       </div>
 
@@ -431,6 +424,22 @@
 
   <!-- ── Toast Container ── -->
   <div class="toast-container" id="toast-container" role="alert" aria-live="assertive"></div>
+
+  <!-- ── Analyzer Popup Modal ── -->
+  <div id="analyzer-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+    <div style="background:#1b2030;border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:24px;width:min(480px, 94vw);box-shadow:0 12px 36px rgba(0,0,0,0.5);color:#e8ecf4;font-family:sans-serif;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <h2 style="margin:0;font-size:1.2rem;font-weight:700;color:#00d4e8;">📊 Session Analysis</h2>
+        <button onclick="document.getElementById('analyzer-modal').style.display='none'" style="background:none;border:none;color:#6b7590;font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
+      </div>
+      <div id="analyzer-modal-body" style="font-size:0.9rem;line-height:1.5;">
+        <!-- Filled by JS -->
+      </div>
+      <div style="margin-top:20px;text-align:right;">
+        <button onclick="document.getElementById('analyzer-modal').style.display='none'" class="btn btn-primary" style="padding:8px 16px;background:rgba(0,212,232,0.12);border:1px solid rgba(0,212,232,0.3);border-radius:20px;color:#00d4e8;font-size:12px;font-family:'Orbitron',monospace;font-weight:700;letter-spacing:1.5px;cursor:pointer;">CLOSE</button>
+      </div>
+    </div>
+  </div>
 
   <script src="emg-engine.js"></script>
   <script src="serial-web.js"></script>
